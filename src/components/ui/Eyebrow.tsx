@@ -1,5 +1,11 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
-export function Eyebrow({ children }: { children: ReactNode }) {
-  return <span className="eyebrow">{children}</span>
+interface EyebrowProps {
+  children: ReactNode
+  style?: CSSProperties
+  className?: string
+}
+
+export function Eyebrow({ children, style, className = '' }: EyebrowProps) {
+  return <span className={`eyebrow ${className}`} style={style}>{children}</span>
 }
