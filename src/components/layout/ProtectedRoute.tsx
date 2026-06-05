@@ -1,20 +1,12 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useAuth } from '@/contexts/AuthContext'
 
-interface ProtectedRouteProps {
-  children: ReactNode
-}
-
-/* PR #2 will wire the real Supabase session here.
-   For now the stub always lets users through. */
-const isAuthenticated = (): boolean => {
-  // TODO (PR #2): return !!supabase.auth.getSession()
-  return true
-}
+interface ProtectedRouteProps { children: ReactNode }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />
-  }
+  const { session, loading } = useAuth()
+  if (loading) return null
+  if (!session) return <Navigate to="/login" replace />
   return <>{children}</>
 }

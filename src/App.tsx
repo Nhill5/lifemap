@@ -1,4 +1,5 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
+import { AuthProvider } from '@/contexts/AuthContext'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { CelebrationProvider } from '@/contexts/CelebrationContext'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
@@ -80,10 +81,12 @@ const router = createBrowserRouter([
 
 export function App() {
   return (
-    <SettingsProvider>
-      <CelebrationProvider>
-        <RouterProvider router={router} />
-      </CelebrationProvider>
-    </SettingsProvider>
+    <AuthProvider>
+      <SettingsProvider>
+        <CelebrationProvider>
+          <RouterProvider router={router} />
+        </CelebrationProvider>
+      </SettingsProvider>
+    </AuthProvider>
   )
 }
