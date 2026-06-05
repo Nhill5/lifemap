@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'primary' | 'accent'
   size?: 'default' | 'sm'
   accentColor?: string
@@ -26,8 +26,8 @@ export function Button({
     .filter(Boolean)
     .join(' ')
 
-  const s: React.CSSProperties = {
-    ...(variant === 'accent' && accentColor ? { '--c': accentColor } as React.CSSProperties : {}),
+  const s: CSSProperties = {
+    ...(variant === 'accent' && accentColor ? { '--c': accentColor } as CSSProperties : {}),
     ...style,
   }
 
