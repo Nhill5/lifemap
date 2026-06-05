@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LifeMap — iPhone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    background:
+      radial-gradient(1100px 700px at 82% -8%, #14171f, transparent 60%),
+      radial-gradient(900px 600px at 4% 108%, #101622, transparent 60%),
+      #07090d;
+    color: #ECEEF3;
+    height: 100%;
+    display: flex;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ---- left rail: copy ---- */
+  .rail {
+    flex: 0 0 360px; max-width: 360px;
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 14px; padding: 56px 48px;
+  }
+  .rail .eyebrow {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .18em;
+    color: #595E6E; font-weight: 700;
+  }
+  .rail h1 {
+    font-family: 'Fraunces', Georgia, serif; font-weight: 500;
+    font-size: 38px; letter-spacing: -.02em; line-height: 1.1;
+  }
+  .rail h1 i { font-style: italic; color: #9DA2B0; font-weight: 400; }
+  .rail p {
+    font-size: 14.5px; color: #9DA2B0; line-height: 1.6; max-width: 34ch;
+  }
+  .rail p b { color: #ECEEF3; font-weight: 600; }
+  .rail .hint {
+    margin-top: 6px; font-size: 12.5px; color: #595E6E;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .rail .hint .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #4FD6A0; box-shadow: 0 0 10px #4FD6A0;
+  }
+
+  /* ---- right stage: the phone ---- */
+  .stage {
+    flex: 1; min-width: 0; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px;
+  }
+  .device-scale { transform-origin: center center; }
+  #root { display: contents; }
+
+  .device-frame-iframe {
+    flex: 1; width: 100%; border: 0; display: block;
+    background: #0a0c11;
+  }
+
+  /* ---- stack on narrow viewports ---- */
+  @media (max-width: 860px) {
+    body { flex-direction: column; overflow-y: auto; }
+    .rail {
+      flex: none; max-width: 560px; width: 100%; margin: 0 auto;
+      text-align: center; align-items: center;
+      padding: 36px 28px 8px; gap: 10px;
+    }
+    .rail h1 { font-size: 30px; }
+    .rail p { max-width: 42ch; }
+    .stage { width: 100%; padding: 16px 16px 40px; }
+  }
+</style>
+</head>
+<body>
+  <div class="rail">
+    <div class="eyebrow">LifeMap · PWA</div>
+    <h1>On your phone,<br /><i>where it lives</i></h1>
+    <p>The full app at iPhone size. <b>Tap through every screen</b> — the zoom tabs, the Weekly Mirror, the workout logger, the celebration blooms. All live, right here.</p>
+    <div class="hint"><span class="dot"></span> Installable to the Home Screen · iOS 16.4+</div>
+  </div>
+
+  <div class="stage">
+    <div class="device-scale" id="scale">
+      <div id="root"></div>
+    </div>
+  </div>
+
+  <!-- React + Babel (pinned) -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="frames/ios-frame.jsx"></script>
+
+  <script type="text/babel">
+    const PHONE_W = 402, PHONE_H = 874;
+
+    function LifeMapPhone() {
+      return (
+        <IOSDevice dark width={PHONE_W} height={PHONE_H}>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column',
+                        paddingTop: 46, paddingBottom: 18, boxSizing: 'border-box' }}>
+            <iframe className="device-frame-iframe" src="LifeMap.html"
+              title="LifeMap running on iPhone" />
+          </div>
+        </IOSDevice>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<LifeMapPhone />);
+
+    // scale the phone to fully fit the available stage, with margin
+    function fit() {
+      const el = document.getElementById('scale');
+      const stage = document.querySelector('.stage');
+      if (!el || !stage) return;
+      const pad = 24; // extra breathing room inside the stage padding
+      const availH = stage.clientHeight - pad;
+      const availW = stage.clientWidth - pad;
+      const s = Math.min(1, availH / PHONE_H, availW / PHONE_W);
+      el.style.transform = `scale(${(s > 0 ? s : 0.4).toFixed(3)})`;
+    }
+    window.addEventListener('resize', fit);
+    setTimeout(fit, 60); setTimeout(fit, 400); setTimeout(fit, 900);
+  </script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LifeMap — Design Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============ DESIGN TOKENS ============ */
+  :root {
+    /* Deep calm ink — never pure black */
+    --bg:        #0a0c11;
+    --bg-elev:   #11141b;
+    --surface:   #161922;
+    --surface-2: #1d212c;
+    --line:        rgba(255,255,255,0.06);
+    --line-strong: rgba(255,255,255,0.11);
+
+    --text:       #ECEEF3;
+    --text-dim:   #9DA2B0;
+    --text-faint: #595E6E;
+
+    /* Curated bucket accents — vivid but slightly soft, harmonious on ink */
+    --school:  #7C9CFF;   /* periwinkle */
+    --work:    #E6B450;   /* warm gold   */
+    --fitness: #4FD6A0;   /* mint        */
+    --looks:   #F18FB2;   /* rose        */
+    --hobby:   #B49BFF;   /* lavender    */
+
+    /* Warm (never alarming) — used for gentle/recovery moments instead of red */
+    --warm: #E6A878;
+
+    --font-voice: 'Fraunces', Georgia, serif;
+    --font-ui:    'Hanken Grotesk', system-ui, sans-serif;
+
+    --r-lg: 22px;
+    --r-md: 16px;
+    --r-sm: 11px;
+    --maxw: 900px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Atmospheric depth: faint top glow + grain */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(124,156,255,0.08), transparent 60%),
+      radial-gradient(900px 500px at 10% 110%, rgba(79,214,160,0.05), transparent 60%);
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .app { position: relative; z-index: 1; max-width: var(--maxw); margin: 0 auto; padding: 0 28px 120px; }
+
+  /* ============ HEADER ============ */
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 30px 0 26px;
+  }
+  .wordmark { display: flex; align-items: center; gap: 11px; }
+  .mark {
+    width: 26px; height: 26px; border-radius: 8px; position: relative;
+    background: linear-gradient(145deg, var(--school), var(--hobby));
+    box-shadow: 0 0 22px -6px var(--school);
+  }
+  .mark::after {
+    content:""; position:absolute; inset: 7px; border-radius: 3px;
+    background: var(--bg);
+  }
+  .wordmark b { font-family: var(--font-voice); font-weight: 500; font-size: 20px; letter-spacing: -0.02em; }
+  .wordmark b i { font-style: italic; color: var(--text-dim); font-weight: 400; }
+
+  .gpa-pill {
+    display: flex; align-items: baseline; gap: 7px;
+    padding: 8px 15px; border-radius: 100px;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  .gpa-pill .n { font-family: var(--font-voice); font-size: 17px; font-weight: 600; }
+  .gpa-pill .l { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.09em; }
+
+  /* ============ SEGMENTED NAV ============ */
+  nav.seg {
+    display: inline-flex; gap: 3px; padding: 4px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 100px;
+    margin-bottom: 44px;
+  }
+  nav.seg button {
+    font-family: var(--font-ui); font-size: 13.5px; font-weight: 500; color: var(--text-dim);
+    background: transparent; border: 0; padding: 9px 20px; border-radius: 100px; cursor: pointer;
+    transition: color .25s, background .25s;
+  }
+  nav.seg button:hover { color: var(--text); }
+  nav.seg button.on { color: var(--bg); background: var(--text); }
+
+  /* ============ SCREEN SYSTEM ============ */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* staggered reveal */
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .active .reveal {
+    opacity: 0; transform: translateY(14px);
+    animation: rise .72s cubic-bezier(.2,.75,.25,1) forwards;
+    animation-delay: var(--d, 0s);
+  }
+
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.13em; color: var(--text-faint); font-weight: 600; }
+
+  /* ============ METER RAIL ============ */
+  .rail { display: flex; gap: 12px; margin-bottom: 30px; flex-wrap: wrap; }
+  .meter {
+    flex: 1; min-width: 150px; display: flex; align-items: center; gap: 13px;
+    padding: 13px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+  }
+  .ring { --p: 0; width: 34px; height: 34px; flex: none; border-radius: 50%;
+    background: conic-gradient(var(--c) calc(var(--p) * 1%), var(--surface-2) 0);
+    display: grid; place-items: center; position: relative; }
+  .ring::after { content:""; position:absolute; inset:4px; border-radius:50%; background: var(--surface); }
+  .meter .info { display: flex; flex-direction: column; line-height: 1.25; }
+  .meter .info .v { font-weight: 600; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+  .meter .info .k { font-size: 11.5px; color: var(--text-faint); }
+
+  /* ============ NOW SCREEN — HERO BLOCK ============ */
+  .now-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 22px; }
+  .now-head .date { font-family: var(--font-voice); font-size: 26px; font-weight: 500; }
+  .now-head .date span { color: var(--text-faint); }
+  .now-head .clock { color: var(--text-dim); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+  .hero-block {
+    position: relative; border-radius: var(--r-lg); padding: 34px 34px 30px;
+    background: linear-gradient(160deg, var(--surface-2), var(--surface));
+    border: 1px solid var(--line-strong); overflow: hidden;
+  }
+  .hero-block::before {
+    content:""; position:absolute; left:0; top:0; bottom:0; width: 4px;
+    background: var(--c); box-shadow: 0 0 26px 1px var(--c);
+  }
+  .hero-block .tag { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color: var(--c); margin-bottom: 16px; }
+  .hero-block .tag .dot { width:7px; height:7px; border-radius:50%; background: var(--c); box-shadow:0 0 10px var(--c); }
+  .hero-block h1 { font-family: var(--font-voice); font-weight: 500; font-size: 38px; line-height: 1.08; letter-spacing: -0.02em; margin-bottom: 10px; }
+  .hero-block .time { color: var(--text-dim); font-size: 15px; font-variant-numeric: tabular-nums; margin-bottom: 24px; }
+  .hero-block .time b { color: var(--text); font-weight: 600; }
+
+  .progress { height: 5px; border-radius: 100px; background: var(--surface-2); overflow:hidden; margin-bottom: 10px; }
+  .progress i { display:block; height:100%; width: 42%; border-radius:100px; background: var(--c); box-shadow: 0 0 14px -2px var(--c); }
+  .progress-meta { display:flex; justify-content:space-between; font-size:12px; color: var(--text-faint); }
+
+  .next {
+    margin-top: 18px; display:flex; align-items:center; gap:16px;
+    padding: 18px 22px; border-radius: var(--r-md); border:1px solid var(--line);
+    background: var(--surface); opacity: 0.72; transition: opacity .25s;
+  }
+  .next:hover { opacity: 1; }
+  .next .lead { font-size:11.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--text-faint); font-weight:600; }
+  .next .nb { width:8px; height:8px; border-radius:50%; background: var(--c2); box-shadow:0 0 10px var(--c2); flex:none; }
+  .next .body { flex:1; }
+  .next .body .t { font-weight:600; font-size:15px; }
+  .next .body .s { font-size:12.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  .collapsed {
+    margin-top: 14px; text-align:center; padding: 14px; cursor:pointer;
+    color: var(--text-faint); font-size: 13px; border-radius: var(--r-md);
+    border: 1px dashed var(--line-strong); transition: color .25s, border-color .25s;
+  }
+  .collapsed:hover { color: var(--text-dim); border-color: var(--text-faint); }
+
+  .voice-line { font-family: var(--font-voice); font-style: italic; font-size: 18px; color: var(--text-dim);
+    text-align:center; margin-top: 34px; line-height: 1.5; }
+  .voice-line b { color: var(--text); font-style: normal; font-weight: 500; }
+
+  /* ============ LIVING BUCKET TILES ============ */
+  @keyframes breathe {
+    0%,100% { box-shadow: 0 0 0 1px var(--a-edge), 0 14px 40px -28px var(--a-glow); }
+    50%     { box-shadow: 0 0 0 1px var(--a-edge), 0 14px 60px -22px var(--a-glow); }
+  }
+  .bucket {
+    --a-edge: color-mix(in srgb, var(--a) 34%, transparent);
+    --a-glow: color-mix(in srgb, var(--a) 60%, transparent);
+    position: relative; border-radius: var(--r-lg); padding: 22px 22px 20px;
+    background: var(--surface); border: 1px solid var(--a-edge); overflow: hidden;
+    transition: transform .3s ease;
+  }
+  .bucket:hover { transform: translateY(-3px); }
+  .bucket::before {
+    content:""; position:absolute; right:-40px; top:-40px; width:130px; height:130px; border-radius:50%;
+    background: radial-gradient(circle, var(--a), transparent 70%); opacity: .16; pointer-events:none;
+  }
+  .bucket .b-top { display:flex; align-items:center; justify-content:space-between; margin-bottom: 18px; }
+  .bucket .b-name { display:flex; align-items:center; gap:9px; font-weight:600; font-size:15px; }
+  .bucket .b-name .d { width:9px; height:9px; border-radius:50%; background: var(--a); box-shadow: 0 0 12px var(--a); }
+  .bucket .state { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color: var(--a); }
+  .bucket .goal { font-family: var(--font-voice); font-size: 19px; font-weight: 500; line-height:1.2; margin-bottom: 6px; }
+  .bucket .sub { font-size: 13px; color: var(--text-dim); margin-bottom: 18px; }
+  .bucket .bar { height:5px; border-radius:100px; background: var(--surface-2); overflow:hidden; }
+  .bucket .bar i { display:block; height:100%; background: var(--a); border-radius:100px; box-shadow: 0 0 12px -2px var(--a); }
+  .bucket .bar-meta { display:flex; justify-content:space-between; margin-top:8px; font-size:11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+  /* states */
+  .bucket.thriving { animation: breathe 5s ease-in-out infinite; }
+  .bucket.wilting  { filter: saturate(.32) brightness(.85); opacity: .82; }
+  .bucket.wilting .state { color: var(--text-faint); }
+  .bucket.parked   { filter: grayscale(1) brightness(.8); opacity: .55; }
+  .bucket.parked .state { color: var(--text-faint); }
+
+  /* ============ BUCKETS SCREEN GRID ============ */
+  .buckets-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .buckets-grid .bucket.span { grid-column: 1 / -1; }
+  @media (max-width: 680px){ .buckets-grid { grid-template-columns: 1fr; } }
+
+  .panorama-head { margin-bottom: 28px; }
+  .panorama-head h2 { font-family: var(--font-voice); font-weight: 500; font-size: 30px; letter-spacing:-0.02em; margin-bottom: 6px; }
+  .panorama-head p { color: var(--text-dim); font-size: 15px; max-width: 46ch; }
+
+  /* ============ WEEKLY MIRROR (STORY) ============ */
+  .beat { margin-bottom: 40px; }
+  .beat .eyebrow { display:block; margin-bottom: 14px; }
+
+  .headline { font-family: var(--font-voice); font-weight: 500; letter-spacing:-0.025em; line-height: 1.1; }
+  .headline .big { font-size: 46px; display:block; }
+  .headline .sub { font-size: 23px; color: var(--text-dim); display:block; margin-top: 10px; line-height:1.35; }
+  .headline .sub b { color: var(--text); font-weight:500; }
+
+  .panorama-mini { display:grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  @media (max-width: 680px){ .panorama-mini { grid-template-columns: repeat(2,1fr);} }
+  .mini {
+    --a-edge: color-mix(in srgb, var(--a) 32%, transparent);
+    --a-glow: color-mix(in srgb, var(--a) 55%, transparent);
+    padding: 16px 14px; border-radius: var(--r-md); background: var(--surface);
+    border: 1px solid var(--a-edge); position:relative; overflow:hidden;
+  }
+  .mini .d { width:9px;height:9px;border-radius:50%;background:var(--a);box-shadow:0 0 12px var(--a); margin-bottom:12px; }
+  .mini .mn { font-size: 12.5px; font-weight:600; }
+  .mini .ms { font-size: 11px; color: var(--text-faint); margin-top:2px; }
+  .mini.thriving { animation: breathe 5s ease-in-out infinite; }
+  .mini.wilting  { filter: saturate(.3) brightness(.85); opacity:.8; }
+  .mini.parked   { filter: grayscale(1) brightness(.8); opacity:.5; }
+
+  /* the gap — calm, NEVER red */
+  .gap-card {
+    border-radius: var(--r-lg); padding: 26px 28px; background: var(--bg-elev);
+    border: 1px solid var(--line-strong); border-left: 3px solid var(--warm);
+  }
+  .gap-card .q { font-family: var(--font-voice); font-size: 22px; font-weight: 500; line-height:1.4; }
+  .gap-card .q b { color: var(--fitness); font-weight:500; }
+  .gap-card .note { margin-top: 12px; font-size: 14px; color: var(--text-dim); }
+
+  /* wins */
+  .wins { display:flex; gap: 12px; flex-wrap: wrap; }
+  .win {
+    flex: 1; min-width: 200px; padding: 18px 20px; border-radius: var(--r-md);
+    background: var(--surface); border: 1px solid var(--line); position:relative; overflow:hidden;
+  }
+  .win .spark { position:absolute; right:-30px; top:-30px; width:90px; height:90px; border-radius:50%;
+    background: radial-gradient(circle, var(--c), transparent 70%); opacity:.22; }
+  .win .label { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color: var(--c); font-weight:600; margin-bottom:8px; }
+  .win .big { font-family: var(--font-voice); font-size: 24px; font-weight:600; }
+  .win .small { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+
+  /* pattern */
+  .pattern {
+    border-radius: var(--r-lg); padding: 24px 28px; background: var(--surface);
+    border: 1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
+  }
+  .pattern .p-text { font-family: var(--font-voice); font-size: 19px; font-weight: 500; line-height:1.4; flex:1; min-width: 260px; }
+  .pattern .p-text b { color: var(--school); font-weight:500; }
+
+  /* the week-ahead proposal */
+  .propose {
+    border-radius: var(--r-lg); padding: 26px 28px;
+    background: linear-gradient(150deg, color-mix(in srgb, var(--fitness) 12%, var(--surface)), var(--surface));
+    border: 1px solid color-mix(in srgb, var(--fitness) 26%, transparent);
+  }
+  .propose .pp { font-family: var(--font-voice); font-size: 20px; font-weight:500; line-height:1.45; margin-bottom: 20px; }
+  .propose .pp b { color: var(--fitness); font-weight:500; }
+
+  .btn-row { display:flex; gap: 11px; }
+  .btn {
+    font-family: var(--font-ui); font-size: 14px; font-weight:600; cursor:pointer;
+    padding: 12px 22px; border-radius: 100px; border: 1px solid var(--line-strong);
+    background: transparent; color: var(--text); transition: transform .15s, background .2s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  .footnote { margin-top: 50px; text-align:center; color: var(--text-faint); font-size: 12.5px; }
+  .footnote code { font-family: var(--font-ui); color: var(--text-dim); }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="wordmark">
+        <div class="mark"></div>
+        <b>Life<i>Map</i></b>
+      </div>
+      <div class="gpa-pill">
+        <span class="n">3.7</span>
+        <span class="l">Life&nbsp;GPA · this week</span>
+      </div>
+    </header>
+
+    <nav class="seg">
+      <button data-s="now" class="on">Now</button>
+      <button data-s="week">Weekly Mirror</button>
+      <button data-s="buckets">Buckets</button>
+    </nav>
+
+    <!-- ================= NOW / NEXT FOCUS ================= -->
+    <section class="screen active" id="now">
+      <div class="now-head reveal" style="--d:.02s">
+        <div class="date">Wednesday <span>· June 3</span></div>
+        <div class="clock">9:41</div>
+      </div>
+
+      <div class="rail reveal" style="--d:.08s">
+        <div class="meter">
+          <div class="ring" style="--c:var(--fitness); --p:47"></div>
+          <div class="info"><span class="v">90 / 190g</span><span class="k">Protein</span></div>
+        </div>
+        <div class="meter">
+          <div class="ring" style="--c:var(--school); --p:42"></div>
+          <div class="info"><span class="v">4,210 / 10k</span><span class="k">Steps</span></div>
+        </div>
+        <div class="meter">
+          <div class="ring" style="--c:var(--work); --p:66"></div>
+          <div class="info"><span class="v">2 / 3 blocks</span><span class="k">Deep work</span></div>
+        </div>
+      </div>
+
+      <div class="hero-block reveal" style="--c:var(--school); --d:.16s">
+        <span class="tag"><span class="dot"></span>School · right now</span>
+        <h1>Thesis draft — Chapter 2</h1>
+        <div class="time"><b>9:00 – 10:30</b> &nbsp;·&nbsp; 42 min in, 48 left</div>
+        <div class="progress"><i></i></div>
+        <div class="progress-meta"><span>Stay with it.</span><span>this is the thing</span></div>
+      </div>
+
+      <div class="next reveal" style="--c2:var(--fitness); --d:.24s">
+        <span class="nb"></span>
+        <div class="body">
+          <div class="lead">Next</div>
+          <div class="t">Gym — Push day <span style="color:var(--text-faint);font-weight:500">· Fitness</span></div>
+        </div>
+        <div class="s">11:00 AM</div>
+      </div>
+
+      <div class="collapsed reveal" style="--d:.30s">↓ &nbsp;4 more blocks today — tap to see the full day</div>
+
+      <p class="voice-line reveal" style="--d:.38s">You came back strong after yesterday.<br><b>Two blocks down before noon — that's your rhythm.</b></p>
+    </section>
+
+    <!-- ================= WEEKLY MIRROR ================= -->
+    <section class="screen" id="week">
+      <div class="beat reveal" style="--d:.02s">
+        <span class="eyebrow">Your week · May 27 – June 2</span>
+        <div class="headline">
+          <span class="big">A strong week.</span>
+          <span class="sub">You showed up <b>5 of 7 days</b> — and came back twice after a slip. <b>That's the whole game.</b></span>
+        </div>
+      </div>
+
+      <div class="beat reveal" style="--d:.12s">
+        <span class="eyebrow">Where your energy actually went</span>
+        <div class="panorama-mini">
+          <div class="mini thriving" style="--a:var(--school)"><div class="d"></div><div class="mn">School</div><div class="ms">Thriving</div></div>
+          <div class="mini thriving" style="--a:var(--work)"><div class="d"></div><div class="mn">Work</div><div class="ms">Thriving</div></div>
+          <div class="mini wilting" style="--a:var(--fitness)"><div class="d"></div><div class="mn">Fitness</div><div class="ms">Wilting</div></div>
+          <div class="mini" style="--a:var(--looks)"><div class="d"></div><div class="mn">Looks</div><div class="ms">Steady</div></div>
+          <div class="mini parked" style="--a:var(--hobby)"><div class="d"></div><div class="mn">Guitar</div><div class="ms">Resting</div></div>
+        </div>
+      </div>
+
+      <div class="beat reveal" style="--d:.22s">
+        <span class="eyebrow">The one gap worth seeing</span>
+        <div class="gap-card">
+          <div class="q">You called <b>Fitness</b> a top-3 priority. It got one gym visit this week.</div>
+          <div class="note">That's the gap. Not a verdict — just the truth. You decide if it matters.</div>
+        </div>
+      </div>
+
+      <div class="beat reveal" style="--d:.32s">
+        <span class="eyebrow">What you earned</span>
+        <div class="wins">
+          <div class="win" style="--c:var(--fitness)"><div class="spark"></div><div class="label">New PR</div><div class="big">Deadlift — 315 lb</div><div class="small">+10 from last month</div></div>
+          <div class="win" style="--c:var(--school)"><div class="spark"></div><div class="label">Milestone</div><div class="big">2,400 words</div><div class="small">Chapter 2 draft, done</div></div>
+          <div class="win" style="--c:var(--work)"><div class="spark"></div><div class="label">Comeback</div><div class="big">Bounced back Thu</div><div class="small">Missed Wed, owned Thursday</div></div>
+        </div>
+      </div>
+
+      <div class="beat reveal" style="--d:.42s">
+        <span class="eyebrow">Something I noticed</span>
+        <div class="pattern">
+          <div class="p-text">You finish hard tasks <b>before noon</b> — and almost nothing after 3pm.</div>
+          <button class="btn">Front-load next week →</button>
+        </div>
+      </div>
+
+      <div class="beat reveal" style="--d:.52s">
+        <span class="eyebrow">Set the week ahead</span>
+        <div class="propose">
+          <div class="pp">Want to protect <b>Fitness</b>? I'll hold <b>3 gym blocks</b> in your mornings — that's when you actually show up.</div>
+          <div class="btn-row">
+            <button class="btn primary">Approve plan</button>
+            <button class="btn">Adjust</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= BUCKETS PANORAMA ================= -->
+    <section class="screen" id="buckets">
+      <div class="panorama-head reveal" style="--d:.02s">
+        <h2>Five things that matter.</h2>
+        <p>Each one's alive or fading based on what you actually do — not what you said you'd do.</p>
+      </div>
+
+      <div class="buckets-grid">
+        <div class="bucket thriving reveal" style="--a:var(--school); --d:.10s">
+          <div class="b-top"><div class="b-name"><span class="d"></span>School</div><div class="state">Thriving</div></div>
+          <div class="goal">4.0 GPA this semester</div>
+          <div class="sub">Thesis · 3 study blocks/week · readings done</div>
+          <div class="bar"><i style="width:78%"></i></div>
+          <div class="bar-meta"><span>On pace</span><span>78%</span></div>
+        </div>
+
+        <div class="bucket thriving reveal" style="--a:var(--work); --d:.16s">
+          <div class="b-top"><div class="b-name"><span class="d"></span>Work</div><div class="state">Thriving</div></div>
+          <div class="goal">Ship the v1 build</div>
+          <div class="sub">Deep work 4×/week · weekly review</div>
+          <div class="bar"><i style="width:71%"></i></div>
+          <div class="bar-meta"><span>On pace</span><span>71%</span></div>
+        </div>
+
+        <div class="bucket wilting reveal" style="--a:var(--fitness); --d:.22s">
+          <div class="b-top"><div class="b-name"><span class="d"></span>Physical Fitness</div><div class="state">Wilting</div></div>
+          <div class="goal">Lose 40 lb by December</div>
+          <div class="sub">Gym 4×/week · 190g protein · 10k steps</div>
+          <div class="bar"><i style="width:31%"></i></div>
+          <div class="bar-meta"><span>Behind pace — 1 gym visit this week</span><span>31%</span></div>
+        </div>
+
+        <div class="bucket reveal" style="--a:var(--looks); --d:.28s">
+          <div class="b-top"><div class="b-name"><span class="d"></span>Looks</div><div class="state" style="color:var(--text-dim)">Steady</div></div>
+          <div class="goal">Consistent skin + grooming</div>
+          <div class="sub">Routine AM/PM · haircut booked</div>
+          <div class="bar"><i style="width:64%"></i></div>
+          <div class="bar-meta"><span>Holding</span><span>64%</span></div>
+        </div>
+
+        <div class="bucket parked span reveal" style="--a:var(--hobby); --d:.34s">
+          <div class="b-top"><div class="b-name"><span class="d"></span>Guitar</div><div class="state">Resting · you parked this for finals</div></div>
+          <div class="goal">Learn 5 songs start-to-finish</div>
+          <div class="sub">Paused on purpose — back after exams. Doesn't count against you.</div>
+        </div>
+      </div>
+
+      <p class="footnote reveal" style="--d:.42s">Prototype · all 3 hero screens · dark-mode default · type: <code>Fraunces</code> (voice) + <code>Hanken Grotesk</code> (UI)</p>
+    </section>
+  </div>
+
+<script>
+  const btns = document.querySelectorAll('nav.seg button');
+  const screens = document.querySelectorAll('.screen');
+  btns.forEach(b => b.addEventListener('click', () => {
+    btns.forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    const target = b.dataset.s;
+    screens.forEach(s => {
+      const on = s.id === target;
+      // retrigger reveal animations by toggling active fresh
+      if (on) { s.classList.remove('active'); void s.offsetWidth; s.classList.add('active'); }
+      else s.classList.remove('active');
+    });
+  }));
+</script>
+</body>
+</html>
