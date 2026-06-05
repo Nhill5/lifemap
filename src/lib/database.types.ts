@@ -651,7 +651,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      complete_onboarding: {
+        Args: { p_buckets: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       accent_slot: "school" | "work" | "fitness" | "looks" | "hobby"

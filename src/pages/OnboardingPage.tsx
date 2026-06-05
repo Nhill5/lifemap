@@ -331,40 +331,21 @@ export function OnboardingPage() {
     setError(null)
 
     try {
-      const { data: inserted, error: bucketsErr } = await supabase
-        .from('buckets')
-        .insert(buckets.map((b, i) => ({
-          user_id:    user.id,
-          name:       b.name.trim() || DEFAULT_NAMES[b.slot],
-          color:      b.slot,
-          state:      'steady' as const,
-          sort_order: i,
-        })))
-        .select('id, color')
-
-      if (bucketsErr || !inserted) throw new Error(bucketsErr?.message ?? 'Failed to save buckets')
-
-      const { error: goalsErr } = await supabase
-        .from('chief_goals')
-        .insert(goals.map(g => {
-          const bucket = inserted.find(b => b.color === g.slot)!
+      // Single transaction via RPC — atomic, idempotent, retryable
+      const { error } = await supabase.rpc('complete_onboarding', {
+        p_buckets: buckets.map((b, i) => {
+          const goal = goals.find(g => g.slot === b.slot)!
           return {
-            user_id:   user.id,
-            bucket_id: bucket.id,
-            title:     g.title.trim(),
-            deadline:  g.deadline || null,
-            status:    'active' as const,
+            name:          b.name.trim() || DEFAULT_NAMES[b.slot],
+            color:         b.slot,
+            sort_order:    i,
+            goal_title:    goal.title.trim(),
+            goal_deadline: goal.deadline || null,
           }
-        }))
+        }),
+      })
 
-      if (goalsErr) throw new Error(goalsErr.message)
-
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .update({ onboarding_state: 'complete' })
-        .eq('id', user.id)
-
-      if (profileErr) throw new Error(profileErr.message)
+      if (error) throw new Error(error.message)
 
       await refreshProfile()
       navigate('/now', { replace: true })
