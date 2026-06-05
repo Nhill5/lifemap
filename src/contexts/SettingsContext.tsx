@@ -38,7 +38,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  // Apply settings as body classes / CSS vars
   useEffect(() => {
     const root = document.documentElement
     root.style.setProperty('--motion', settings.motion === 'calm' ? '0.7' : settings.motion === 'off' ? '0' : '1')

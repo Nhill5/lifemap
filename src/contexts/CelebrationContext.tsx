@@ -22,7 +22,6 @@ export function useCelebration() {
   return ctx
 }
 
-/* Full-screen bloom state — only moment/bloom tier takes the screen */
 interface BloomState {
   tier: CelebrationOptions['tier']
   title: string
@@ -36,9 +35,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const celebrate = useCallback((opts: CelebrationOptions) => {
-    // soft / beat are handled inline by components — only moment/bloom take the overlay
     if (opts.tier === 'soft' || opts.tier === 'beat') return
-
     if (timerRef.current) clearTimeout(timerRef.current)
     setBloom({
       tier: opts.tier,
@@ -64,7 +61,6 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/* ---- Bloom overlay component ---- */
 function BloomOverlay({
   state,
   show,
@@ -132,4 +128,3 @@ function BloomOverlay({
     </div>
   )
 }
-
