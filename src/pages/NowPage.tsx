@@ -509,6 +509,19 @@ export function NowPage() {
           </button>
         </div>
       )}
+
+      {/* Evening mirror entry */}
+      <div style={{ marginTop: 40, textAlign: 'center' }}>
+        <button
+          onClick={() => navigate('/mirror/evening')}
+          style={{
+            background: 'none', border: 'none', color: 'var(--text-dim)',
+            fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          Reflect on today →
+        </button>
+      </div>
     </AppShell>
   )
 }

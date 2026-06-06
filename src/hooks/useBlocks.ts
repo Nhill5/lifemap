@@ -78,6 +78,14 @@ export function useBlocks(date: string) {
     refetch()
   }
 
+  /** Evening-mirror "assume adherence": flush remaining planned blocks to done. */
+  async function confirmPlannedAsDone() {
+    if (!user) return
+    await supabase.from('blocks').update({ status: 'done' })
+      .eq('user_id', user.id).eq('date', date).eq('status', 'planned')
+    refetch()
+  }
+
   async function addBlock({ title, bucketId, startTime, endTime, isMajor = false }: AddBlockParams) {
     if (!user) return
     let taskId: string | null = null
@@ -153,5 +161,5 @@ export function useBlocks(date: string) {
     refetch()
   }
 
-  return { blocks, loading, setStatus, addBlock, editBlock, carryBlock, dropBlock, refetch }
+  return { blocks, loading, setStatus, confirmPlannedAsDone, addBlock, editBlock, carryBlock, dropBlock, refetch }
 }
