@@ -95,6 +95,7 @@ export interface Task {
   status: TaskStatus
   due_date: string | null
   rollover_count: number            // zombie detection ≥ 3–4
+  is_major: boolean                 // surfaces at week level (§25)
   completed_at: string | null
   created_at: string
 }

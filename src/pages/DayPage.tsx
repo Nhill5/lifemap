@@ -37,12 +37,41 @@ const inputStyle: CSSProperties = {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Major-task toggle — large tap target for mobile                     */
+/* ------------------------------------------------------------------ */
+
+function MajorToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '11px 12px', minHeight: 44, boxSizing: 'border-box',
+        background: value ? 'color-mix(in srgb, var(--work) 12%, var(--bg))' : 'var(--bg)',
+        border: `1px solid ${value ? 'color-mix(in srgb, var(--work) 45%, transparent)' : 'var(--line)'}`,
+        borderRadius: 'var(--r-sm)', cursor: 'pointer',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={value}
+        onChange={e => onChange(e.target.checked)}
+        style={{ width: 20, height: 20, accentColor: 'var(--work)', cursor: 'pointer', flexShrink: 0 }}
+      />
+      <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.3 }}>
+        Major task <span style={{ color: 'var(--text-dim)' }}>— plan at week level</span>
+      </span>
+    </label>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Add-block form                                                      */
 /* ------------------------------------------------------------------ */
 
 interface AddBlockFormProps {
   buckets: Bucket[]
-  onAdd: (title: string, bucketId: string | null, start: string, end: string) => Promise<void>
+  onAdd: (title: string, bucketId: string | null, start: string, end: string, isMajor: boolean) => Promise<void>
   onCancel: () => void
 }
 
@@ -51,6 +80,7 @@ function AddBlockForm({ buckets, onAdd, onCancel }: AddBlockFormProps) {
   const [bucketId, setBucketId] = useState<string>('')
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime]     = useState('10:00')
+  const [isMajor, setIsMajor]     = useState(false)
   const [saving, setSaving]       = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
@@ -60,7 +90,7 @@ function AddBlockForm({ buckets, onAdd, onCancel }: AddBlockFormProps) {
     if (!title.trim() || !startTime || !endTime) return
     setSaving(true)
     try {
-      await onAdd(title.trim(), bucketId || null, startTime, endTime)
+      await onAdd(title.trim(), bucketId || null, startTime, endTime, isMajor)
     } finally {
       setSaving(false)
     }
@@ -112,6 +142,8 @@ function AddBlockForm({ buckets, onAdd, onCancel }: AddBlockFormProps) {
         </div>
       </div>
 
+      <MajorToggle value={isMajor} onChange={setIsMajor} />
+
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
         <Button
           variant="primary"
@@ -144,6 +176,7 @@ function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditF
   const [bucketId, setBucketId]   = useState<string>(block.bucket_id ?? '')
   const [startTime, setStartTime] = useState(block.start_time)
   const [endTime, setEndTime]     = useState(block.end_time)
+  const [isMajor, setIsMajor]     = useState(block.is_major)
   const [saving, setSaving]       = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
@@ -153,7 +186,7 @@ function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditF
     if (!title.trim()) return
     setSaving(true)
     try {
-      await onSave({ title: title.trim(), bucketId: bucketId || null, startTime, endTime })
+      await onSave({ title: title.trim(), bucketId: bucketId || null, startTime, endTime, isMajor })
     } finally {
       setSaving(false)
     }
@@ -206,6 +239,8 @@ function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditF
         </div>
       </div>
 
+      <MajorToggle value={isMajor} onChange={setIsMajor} />
+
       <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
         <Button variant="primary" disabled={!title.trim() || saving} onClick={handleSave} style={{ flex: 1 }}>
           {saving ? 'Saving…' : 'Save'}
@@ -244,8 +279,8 @@ export function DayPage() {
     setParams(newDate === today ? {} : { date: newDate })
   }
 
-  async function handleAddBlock(title: string, bucketId: string | null, start: string, end: string) {
-    await blocksHook.addBlock({ title, bucketId, startTime: start, endTime: end })
+  async function handleAddBlock(title: string, bucketId: string | null, start: string, end: string, isMajor: boolean) {
+    await blocksHook.addBlock({ title, bucketId, startTime: start, endTime: end, isMajor })
     setShowAddForm(false)
   }
 

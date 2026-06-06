@@ -102,7 +102,7 @@ function ConsistencyRing({ score, color, label }: { score: BucketScore; color: s
 /*  WeekPage                                                            */
 /* ------------------------------------------------------------------ */
 
-type TaskRow = { id: string; bucket_id: string | null; rollover_count: number; buckets: { id: string; name: string; color: string } | null }
+type TaskRow = { id: string; bucket_id: string | null; rollover_count: number; is_major: boolean; buckets: { id: string; name: string; color: string } | null }
 
 export function WeekPage() {
   const navigate = useNavigate()
@@ -127,7 +127,7 @@ export function WeekPage() {
     Promise.all([
       supabase
         .from('blocks')
-        .select('*, tasks(id, bucket_id, rollover_count, buckets(id, name, color))')
+        .select('*, tasks(id, bucket_id, rollover_count, is_major, buckets(id, name, color))')
         .eq('user_id', user.id)
         .gte('date', weekMonday)
         .lte('date', weekEnd)
@@ -150,6 +150,7 @@ export function WeekPage() {
           bucket_color: (bucket?.color ?? null) as AccentSlot | null,
           bucket_name: bucket?.name ?? null,
           rollover_count: tasks?.rollover_count ?? 0,
+          is_major: tasks?.is_major ?? false,
         }
       })
       setBlocks(richBlocks)
@@ -158,10 +159,14 @@ export function WeekPage() {
     })
   }, [user, weekMonday, weekEnd])
 
-  // Group blocks by date
+  // Week shows MAJOR tasks only — high-altitude intent, not minute detail (§25).
+  // Day view keeps the full timeline; rings below still score every block.
+  const majorBlocks = blocks.filter(b => b.is_major)
+
+  // Group major blocks by date for the grid
   const blocksByDate: Record<string, RichBlock[]> = {}
   for (const d of days) blocksByDate[d] = []
-  for (const b of blocks) {
+  for (const b of majorBlocks) {
     if (blocksByDate[b.date]) blocksByDate[b.date].push(b)
   }
 
@@ -239,7 +244,12 @@ export function WeekPage() {
         </div>
       )}
 
-      {/* Week grid */}
+      {/* Week grid — major tasks only */}
+      {!loading && (
+        <Eyebrow style={{ marginBottom: 10, display: 'block' }}>
+          Major tasks · week intent
+        </Eyebrow>
+      )}
       <div className="week-grid-wrap reveal" style={{ '--d': '0.1s' } as CSSProperties}>
         <div
           style={{
@@ -334,7 +344,7 @@ export function WeekPage() {
       </div>
 
       {/* Empty state for whole week */}
-      {!loading && blocks.length === 0 && (
+      {!loading && majorBlocks.length === 0 && (
         <div
           className="reveal"
           style={{
@@ -345,7 +355,15 @@ export function WeekPage() {
             color: 'var(--text-faint)',
           } as CSSProperties}
         >
-          No blocks this week.
+          {blocks.length === 0
+            ? 'No blocks this week.'
+            : 'No major tasks this week.'}
+          <br />
+          <span style={{ fontSize: 13, color: 'var(--text-faint)' }}>
+            {blocks.length === 0
+              ? ''
+              : 'Mark a task “Major” on the Day view to plan it here.'}
+          </span>
           <br />
           <button
             onClick={() => navigate('/day')}
@@ -355,7 +373,7 @@ export function WeekPage() {
               textDecoration: 'underline', fontFamily: 'inherit',
             }}
           >
-            Plan today →
+            {blocks.length === 0 ? 'Plan today →' : 'Go to Day →'}
           </button>
         </div>
       )}

@@ -435,6 +435,7 @@ export type Database = {
           created_at: string
           due_date: string | null
           id: string
+          is_major: boolean
           rollover_count: number
           status: Database["public"]["Enums"]["task_status"]
           title: string
@@ -447,6 +448,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          is_major?: boolean
           rollover_count?: number
           status?: Database["public"]["Enums"]["task_status"]
           title: string
@@ -459,6 +461,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          is_major?: boolean
           rollover_count?: number
           status?: Database["public"]["Enums"]["task_status"]
           title?: string

@@ -10,6 +10,7 @@ export interface RichBlock extends Omit<Block, 'sub_goal_id' | 'task_id'> {
   bucket_color: AccentSlot | null
   bucket_name: string | null
   rollover_count: number
+  is_major: boolean
 }
 
 interface AddBlockParams {
@@ -17,6 +18,7 @@ interface AddBlockParams {
   bucketId: string | null
   startTime: string
   endTime: string
+  isMajor?: boolean
 }
 
 export interface EditBlockParams {
@@ -24,12 +26,14 @@ export interface EditBlockParams {
   bucketId: string | null
   startTime: string
   endTime: string
+  isMajor: boolean
 }
 
 type TaskRow = {
   id: string
   bucket_id: string | null
   rollover_count: number
+  is_major: boolean
   buckets: { id: string; name: string; color: string } | null
 }
 
@@ -42,6 +46,7 @@ function toRich(b: Block & { tasks: TaskRow | null }): RichBlock {
     bucket_color: (bucket?.color ?? null) as AccentSlot | null,
     bucket_name: bucket?.name ?? null,
     rollover_count: tasks?.rollover_count ?? 0,
+    is_major: tasks?.is_major ?? false,
   }
 }
 
@@ -57,7 +62,7 @@ export function useBlocks(date: string) {
     setLoading(true)
     supabase
       .from('blocks')
-      .select('*, tasks(id, bucket_id, rollover_count, buckets(id, name, color))')
+      .select('*, tasks(id, bucket_id, rollover_count, is_major, buckets(id, name, color))')
       .eq('user_id', user.id)
       .eq('date', date)
       .in('status', ['planned', 'done', 'missed', 'moved'])
@@ -73,13 +78,15 @@ export function useBlocks(date: string) {
     refetch()
   }
 
-  async function addBlock({ title, bucketId, startTime, endTime }: AddBlockParams) {
+  async function addBlock({ title, bucketId, startTime, endTime, isMajor = false }: AddBlockParams) {
     if (!user) return
     let taskId: string | null = null
-    if (bucketId) {
+    // A task is needed if there's a bucket OR the block is flagged major
+    // (is_major lives on the task, so major external blocks still get one).
+    if (bucketId || isMajor) {
       const { data: task } = await supabase
         .from('tasks')
-        .insert({ user_id: user.id, bucket_id: bucketId, title, status: 'todo', rollover_count: 0 })
+        .insert({ user_id: user.id, bucket_id: bucketId, title, status: 'todo', rollover_count: 0, is_major: isMajor })
         .select('id')
         .single()
       taskId = task?.id ?? null
@@ -97,21 +104,24 @@ export function useBlocks(date: string) {
     refetch()
   }
 
-  async function editBlock(block: RichBlock, { title, bucketId, startTime, endTime }: EditBlockParams) {
+  async function editBlock(block: RichBlock, { title, bucketId, startTime, endTime, isMajor }: EditBlockParams) {
     if (!user) return
     let taskId = block.task_id
 
-    if (bucketId && block.task_id) {
-      await supabase.from('tasks').update({ title, bucket_id: bucketId }).eq('id', block.task_id)
-    } else if (bucketId && !block.task_id) {
+    if (block.task_id) {
+      // Existing task: update title, bucket, and major flag in place
+      await supabase
+        .from('tasks')
+        .update({ title, bucket_id: bucketId, is_major: isMajor })
+        .eq('id', block.task_id)
+    } else if (bucketId || isMajor) {
+      // No task yet, but now one is needed (bucket assigned or marked major)
       const { data: task } = await supabase
         .from('tasks')
-        .insert({ user_id: user.id, bucket_id: bucketId, title, status: 'todo', rollover_count: 0 })
+        .insert({ user_id: user.id, bucket_id: bucketId, title, status: 'todo', rollover_count: 0, is_major: isMajor })
         .select('id')
         .single()
       taskId = task?.id ?? null
-    } else if (!bucketId && block.task_id) {
-      await supabase.from('tasks').update({ bucket_id: null }).eq('id', block.task_id)
     }
 
     await supabase.from('blocks').update({
