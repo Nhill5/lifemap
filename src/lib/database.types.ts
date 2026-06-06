@@ -151,6 +151,41 @@ export type Database = {
           },
         ]
       }
+      chief_goal_progress: {
+        Row: {
+          chief_goal_id: string
+          created_at: string
+          date: string
+          id: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          chief_goal_id: string
+          created_at?: string
+          date: string
+          id?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          chief_goal_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chief_goal_progress_chief_goal_id_fkey"
+            columns: ["chief_goal_id"]
+            isOneToOne: false
+            referencedRelation: "chief_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       day_plans: {
         Row: {
           committed_at: string | null

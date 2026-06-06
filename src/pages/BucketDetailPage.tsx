@@ -7,7 +7,9 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 import { MeterTile, type MeterData } from '@/components/ui/MeterTile'
 import { useBucketDetail, type ChiefGoalParams, type SubGoalParams } from '@/hooks/useBucketDetail'
 import { useProposals, type Proposal } from '@/hooks/useProposals'
+import { useChiefGoalProgress } from '@/hooks/useChiefGoalProgress'
 import { useToday } from '@/hooks/useToday'
+import { computePace } from '@/lib/pace'
 import { stateLabel } from '@/lib/accent'
 import type { ChiefGoal, SubGoal, SubGoalType } from '@/types'
 
@@ -95,6 +97,85 @@ function ChiefGoalEditor({
           {saving ? 'Saving…' : 'Save chief goal'}
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Outcome needle — the chief-goal pace tracker (PR #9)                */
+/* ------------------------------------------------------------------ */
+
+function OutcomeBlock({ goal, color, today }: { goal: ChiefGoal; color: string; today: string }) {
+  const { entries, logValue } = useChiefGoalProgress(goal.id)
+  const pace = computePace(goal, entries, today)
+  const [val, setVal] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function log() {
+    if (val.trim() === '') return
+    setSaving(true)
+    try {
+      await logValue(today, Number(val))
+      setVal('')
+    } finally { setSaving(false) }
+  }
+
+  const accentColor = pace.hasData ? (pace.onPace ? color : 'var(--warm)') : 'var(--text-faint)'
+
+  return (
+    <div style={{ marginTop: 4, marginBottom: 18 }}>
+      {pace.nudge ? (
+        <p style={{ fontSize: 13, color: 'var(--text-faint)', margin: '0 0 12px', lineHeight: 1.45 }}>
+          {pace.nudge}
+        </p>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 600, color: accentColor, marginBottom: 8 }}>
+            {pace.label}
+          </div>
+
+          {/* Needle: progress fill + faint "should be here" marker */}
+          <div className="bd-bar" style={{ position: 'relative' }}>
+            <i style={{ width: `${pace.pct}%`, background: accentColor }} />
+            <span
+              title="Where a straight line to the deadline would put you"
+              style={{
+                position: 'absolute', top: -2, bottom: -2, left: `${pace.expectedPct}%`,
+                width: 2, background: 'var(--text-faint)', opacity: 0.7, borderRadius: 2,
+              }}
+            />
+          </div>
+
+          <div className="bd-pace-note" style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <span>
+              {pace.current != null ? `Now ${pace.current}${pace.unit ? ` ${pace.unit}` : ''}` : '—'}
+              {' · '}{pace.pct}% there
+            </span>
+            <span style={{ color: 'var(--text-faint)' }}>baseline {pace.baseline} → {pace.target}</span>
+          </div>
+          {pace.detail && (
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '8px 0 0', lineHeight: 1.45 }}>
+              {pace.detail}
+            </p>
+          )}
+        </>
+      )}
+
+      {/* Manual entry */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, maxWidth: 320 }}>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          placeholder={pace.current != null ? `Today's value (now ${pace.current})` : "Today's value"}
+          style={inputStyle}
+          onKeyDown={e => e.key === 'Enter' && log()}
+        />
+        <Button size="sm" variant="primary" disabled={val.trim() === '' || saving} onClick={log}>
+          {saving ? '…' : 'Log'}
+        </Button>
       </div>
     </div>
   )
@@ -388,23 +469,25 @@ export function BucketDetailPage() {
           />
         ) : chiefGoal ? (
           <>
-            <div className="bd-chief-label">Chief goal</div>
+            <div className="bd-chief-label">Chief goal · the outcome</div>
             <div className="bd-chief">{chiefGoal.title}</div>
 
+            {/* Outcome needle + pace read */}
+            <OutcomeBlock goal={chiefGoal} color={color} today={today} />
+
+            {/* Weekly inputs — the controllable half (inputs & outcome police each other) */}
             {target > 0 && (
-              <>
+              <div style={{ marginTop: 4 }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-faint)', fontWeight: 600, marginBottom: 6 }}>
+                  Inputs this week
+                </div>
                 <div className="bd-bar"><i style={{ width: `${adherence}%` }} /></div>
                 <div className="bd-pace-note">
-                  {doneTotal} of {target} weekly inputs done · {adherence}% this week
+                  {doneTotal} of {target} weekly inputs done · {adherence}%
                 </div>
-              </>
+              </div>
             )}
-            <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 13, color: 'var(--text-dim)', flexWrap: 'wrap' }}>
-              {chiefGoal.target_value != null && (
-                <span>Target: {chiefGoal.target_value}{chiefGoal.target_unit ? ` ${chiefGoal.target_unit}` : ''}</span>
-              )}
-              {chiefGoal.deadline && <span>By {new Date(chiefGoal.deadline + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-            </div>
+
             <button
               onClick={() => setEditingChief(true)}
               style={{ ...pillBtn, marginTop: 16 }}

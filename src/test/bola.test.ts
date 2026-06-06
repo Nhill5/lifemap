@@ -95,6 +95,8 @@ beforeAll(async () => {
 
   await admin.from('track_logs').insert({ user_id: uidB, sub_goal_id: sg!.id, date: '2026-06-04', rating: 'hit', source: 'manual' })
 
+  await admin.from('chief_goal_progress').insert({ user_id: uidB, chief_goal_id: cg!.id, date: '2026-06-04', value: 210 })
+
   const { data: ex } = await admin
     .from('exercises')
     .insert({ user_id: uidB, name: 'B-squat' })
@@ -140,7 +142,7 @@ describe('BOLA — User A cannot access User B data via PostgREST API', () => {
 
   // Tables with direct user_id: assert User B's rows are invisible to User A
   const directTables = [
-    'buckets', 'chief_goals', 'sub_goals', 'tasks', 'blocks',
+    'buckets', 'chief_goals', 'chief_goal_progress', 'sub_goals', 'tasks', 'blocks',
     'day_plans', 'track_logs', 'workouts',
     'fitbit_tokens', 'fitbit_data', 'journal_entries',
     'events', 'unlocks', 'notifications_log',

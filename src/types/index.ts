@@ -113,6 +113,15 @@ export interface Block {
   status: BlockStatus
 }
 
+export interface ChiefGoalProgress {
+  id: string
+  user_id: string
+  chief_goal_id: string
+  date: string                      // ISO date
+  value: number
+  created_at: string
+}
+
 /* ---- Commitment anchor ---- */
 export interface DayPlan {
   id: string
