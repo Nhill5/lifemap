@@ -415,6 +415,11 @@ export function NowPage() {
                 ✓ Done
               </span>
             )}
+            {heroBlock.bucket_color === 'fitness' && (
+              <Button size="sm" onClick={() => navigate(`/workout/${heroBlock.id}`)}>
+                Log workout →
+              </Button>
+            )}
             <Button size="sm" onClick={() => navigate('/day')}>
               Edit →
             </Button>

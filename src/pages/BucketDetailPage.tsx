@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { BackBar } from '@/components/layout/BackBar'
 import { Button } from '@/components/ui/Button'
@@ -380,6 +380,7 @@ const rowStyle: CSSProperties = {
 
 export function BucketDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const today = useToday()
   const detail = useBucketDetail(id)
   const proposals = useProposals(today)
@@ -507,6 +508,15 @@ export function BucketDetailPage() {
           </>
         )}
       </div>
+
+      {/* Workout logger entry — the most-central bucket's daily ritual (§17) */}
+      {bucket.color === 'fitness' && (
+        <div style={{ marginTop: 16 }}>
+          <Button onClick={() => navigate('/workout')} style={{ width: '100%' }}>
+            Log a workout →
+          </Button>
+        </div>
+      )}
 
       {/* Track-it meters */}
       {meters.length > 0 && (
