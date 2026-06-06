@@ -19,6 +19,13 @@ interface AddBlockParams {
   endTime: string
 }
 
+export interface EditBlockParams {
+  title: string
+  bucketId: string | null
+  startTime: string
+  endTime: string
+}
+
 type TaskRow = {
   id: string
   bucket_id: string | null
@@ -90,6 +97,33 @@ export function useBlocks(date: string) {
     refetch()
   }
 
+  async function editBlock(block: RichBlock, { title, bucketId, startTime, endTime }: EditBlockParams) {
+    if (!user) return
+    let taskId = block.task_id
+
+    if (bucketId && block.task_id) {
+      await supabase.from('tasks').update({ title, bucket_id: bucketId }).eq('id', block.task_id)
+    } else if (bucketId && !block.task_id) {
+      const { data: task } = await supabase
+        .from('tasks')
+        .insert({ user_id: user.id, bucket_id: bucketId, title, status: 'todo', rollover_count: 0 })
+        .select('id')
+        .single()
+      taskId = task?.id ?? null
+    } else if (!bucketId && block.task_id) {
+      await supabase.from('tasks').update({ bucket_id: null }).eq('id', block.task_id)
+    }
+
+    await supabase.from('blocks').update({
+      title,
+      start_time: startTime,
+      end_time: endTime,
+      task_id: taskId,
+      source: bucketId ? ('task' as const) : ('external' as const),
+    }).eq('id', block.id)
+    refetch()
+  }
+
   async function carryBlock(block: RichBlock, toDate: string) {
     await supabase.from('blocks').update({ date: toDate }).eq('id', block.id)
     if (block.task_id) {
@@ -102,12 +136,12 @@ export function useBlocks(date: string) {
   }
 
   async function dropBlock(block: RichBlock) {
-    await supabase.from('blocks').delete().eq('id', block.id)
+    await supabase.from('blocks').update({ status: 'dropped' }).eq('id', block.id)
     if (block.task_id) {
       await supabase.from('tasks').update({ status: 'dropped' }).eq('id', block.task_id)
     }
     refetch()
   }
 
-  return { blocks, loading, setStatus, addBlock, carryBlock, dropBlock, refetch }
+  return { blocks, loading, setStatus, addBlock, editBlock, carryBlock, dropBlock, refetch }
 }

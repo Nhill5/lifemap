@@ -169,6 +169,7 @@ export function NowPage() {
   const today = useToday()
   const yesterday = isoOffset(today, -1)
   const clock = useClock()
+  const [heroDeleteConfirm, setHeroDeleteConfirm] = useState(false)
 
   const todayHook = useBlocks(today)
   const yesterdayHook = useBlocks(yesterday)
@@ -324,7 +325,7 @@ export function NowPage() {
             </>
           )}
 
-          <div className="hero-actions" style={{ marginTop: 20 }}>
+          <div className="hero-actions" style={{ marginTop: 20, flexWrap: 'wrap', gap: 10 }}>
             {heroBlock.status === 'planned' && (
               <Button
                 variant="primary"
@@ -339,8 +340,29 @@ export function NowPage() {
               </span>
             )}
             <Button size="sm" onClick={() => navigate('/day')}>
-              Full day →
+              Edit →
             </Button>
+            {heroDeleteConfirm ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-faint)' }}>Drop this block?</span>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    setHeroDeleteConfirm(false)
+                    await todayHook.dropBlock(heroBlock)
+                  }}
+                >
+                  Drop
+                </Button>
+                <Button size="sm" onClick={() => setHeroDeleteConfirm(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" onClick={() => setHeroDeleteConfirm(true)}>
+                Delete
+              </Button>
+            )}
           </div>
         </div>
       )}

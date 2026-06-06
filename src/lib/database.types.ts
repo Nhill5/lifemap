@@ -660,7 +660,7 @@ export type Database = {
       accent_slot: "school" | "work" | "fitness" | "looks" | "hobby"
       accountability_dial: "gentle" | "balanced" | "drill"
       block_source: "sub_goal" | "task" | "external"
-      block_status: "planned" | "done" | "missed" | "moved"
+      block_status: "planned" | "done" | "missed" | "moved" | "dropped"
       bucket_state: "thriving" | "steady" | "wilting" | "parked"
       data_source: "manual" | "fitbit" | "workout_logger"
       event_type:
@@ -803,7 +803,7 @@ export const Constants = {
       accent_slot: ["school", "work", "fitness", "looks", "hobby"],
       accountability_dial: ["gentle", "balanced", "drill"],
       block_source: ["sub_goal", "task", "external"],
-      block_status: ["planned", "done", "missed", "moved"],
+      block_status: ["planned", "done", "missed", "moved", "dropped"],
       bucket_state: ["thriving", "steady", "wilting", "parked"],
       data_source: ["manual", "fitbit", "workout_logger"],
       event_type: ["task", "subgoal", "milestone", "chief_goal", "unlock", "comeback", "PR"],
