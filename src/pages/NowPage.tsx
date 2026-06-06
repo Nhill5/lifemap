@@ -7,6 +7,7 @@ import { useToday, isoOffset, formatDateLabel } from '@/hooks/useToday'
 import { useClock, timeToMinutes, formatTime } from '@/hooks/useClock'
 import { useBlocks, type RichBlock } from '@/hooks/useBlocks'
 import { useDayPlan } from '@/hooks/useDayPlan'
+import { useProposals, type Proposal } from '@/hooks/useProposals'
 import { accent } from '@/lib/accent'
 
 const ZOMBIE_THRESHOLD = 3
@@ -161,6 +162,50 @@ function NextCard({ block, onClick }: { block: RichBlock; onClick: () => void })
 }
 
 /* ------------------------------------------------------------------ */
+/*  ProposalCard — a proposed block from a sub-goal cadence             */
+/* ------------------------------------------------------------------ */
+
+function ProposalCard({ proposal, onAccept }: { proposal: Proposal; onAccept: () => Promise<void> }) {
+  const [working, setWorking] = useState(false)
+  const c = proposal.bucketColor ? accent(proposal.bucketColor) : 'var(--text-faint)'
+
+  async function accept() {
+    setWorking(true)
+    try { await onAccept() } finally { setWorking(false) }
+  }
+
+  return (
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        borderLeft: `3px solid ${c}`,
+        borderRadius: 'var(--r-md)',
+        padding: '12px 14px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        opacity: working ? 0.45 : 1,
+        transition: 'opacity 0.2s',
+        pointerEvents: working ? 'none' : undefined,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {proposal.title}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+          {formatTime(proposal.startTime)} – {formatTime(proposal.endTime)}
+          {proposal.bucketName && <span style={{ marginLeft: 7, color: c, fontWeight: 600 }}>· {proposal.bucketName}</span>}
+          <span style={{ marginLeft: 7, color: 'var(--text-faint)' }}>
+            {proposal.scheduledThisWeek}/{proposal.cadence} this week
+          </span>
+        </div>
+      </div>
+      <Button size="sm" variant="primary" onClick={accept}>Add</Button>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  NowPage                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -174,6 +219,7 @@ export function NowPage() {
   const todayHook = useBlocks(today)
   const yesterdayHook = useBlocks(yesterday)
   const dayPlan = useDayPlan(today)
+  const proposals = useProposals(today)
 
   const nowMinutes = timeToMinutes(clock)
 
@@ -250,8 +296,38 @@ export function NowPage() {
         </div>
       )}
 
+      {/* Proposed from your goals — the proposal engine (spec §9) */}
+      {!dayPlan.isCommitted && proposals.proposals.length > 0 && (
+        <div className="reveal" style={{ '--d': '0.08s', marginBottom: 28 } as CSSProperties}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+            <Eyebrow style={{ display: 'block' }}>
+              Proposed from your goals · {proposals.proposals.length}
+            </Eyebrow>
+            <button
+              onClick={async () => { await proposals.acceptAll(today); todayHook.refetch() }}
+              style={{
+                background: 'none', border: 'none', color: 'var(--work)',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                fontFamily: 'inherit',
+              }}
+            >
+              Add all
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {proposals.proposals.map(p => (
+              <ProposalCard
+                key={p.subGoalId}
+                proposal={p}
+                onAccept={async () => { await proposals.accept(p, today); todayHook.refetch() }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Morning planning prompt */}
-      {!dayPlan.isCommitted && !heroBlock && triageBlocks.length === 0 && (
+      {!dayPlan.isCommitted && !heroBlock && triageBlocks.length === 0 && proposals.proposals.length === 0 && (
         <div className="reveal propose" style={{ '--d': '0.1s' } as CSSProperties}>
           <p className="pp">
             Nothing on the schedule yet.<br />
