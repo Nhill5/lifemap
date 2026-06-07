@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
@@ -8,6 +8,9 @@ import { useClock, timeToMinutes, formatTime } from '@/hooks/useClock'
 import { useBlocks, type RichBlock } from '@/hooks/useBlocks'
 import { useDayPlan } from '@/hooks/useDayPlan'
 import { useProposals, type Proposal } from '@/hooks/useProposals'
+import { useConsistency } from '@/hooks/useConsistency'
+import { useCelebration } from '@/contexts/CelebrationContext'
+import { celebrationFor } from '@/lib/celebrate'
 import { accent } from '@/lib/accent'
 
 const ZOMBIE_THRESHOLD = 3
@@ -220,6 +223,19 @@ export function NowPage() {
   const yesterdayHook = useBlocks(yesterday)
   const dayPlan = useDayPlan(today)
   const proposals = useProposals(today)
+  const { result: consistency } = useConsistency()
+  const { celebrate } = useCelebration()
+
+  // Comeback bonus (§6 masterstroke): slipped, then showed up. Fire once/day.
+  useEffect(() => {
+    if (!consistency?.comeback) return
+    const key = `lm-comeback-${today}`
+    try {
+      if (localStorage.getItem(key)) return
+      localStorage.setItem(key, '1')
+    } catch { /* ignore storage errors */ }
+    celebrate(celebrationFor('comeback', 'Comeback', 'You slipped and showed up. That’s the whole game.', 'var(--fitness)'))
+  }, [consistency?.comeback, today, celebrate])
 
   const nowMinutes = timeToMinutes(clock)
 
@@ -272,6 +288,24 @@ export function NowPage() {
         </div>
         <div className="clock">{formatTime(clock)}</div>
       </div>
+
+      {/* Comeback acknowledgment — warm, the most celebrated act (§6) */}
+      {consistency?.comeback && (
+        <div
+          className="reveal"
+          style={{
+            '--d': '0.04s', marginBottom: 24, padding: '14px 18px',
+            borderRadius: 'var(--r-md)',
+            background: 'color-mix(in srgb, var(--fitness) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--fitness) 28%, transparent)',
+          } as CSSProperties}
+        >
+          <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--fitness)' }}>Comeback ✦</div>
+          <div style={{ fontSize: 14, color: 'var(--text-dim)', marginTop: 3 }}>
+            You slipped and showed up. That’s the whole game.
+          </div>
+        </div>
+      )}
 
       {/* Triage */}
       {triageBlocks.length > 0 && (

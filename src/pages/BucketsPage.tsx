@@ -3,17 +3,29 @@ import { AppShell } from '@/components/layout/AppShell'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { BucketTile } from '@/components/ui/BucketTile'
 import { useBucketPanorama } from '@/hooks/useBucketPanorama'
+import { useConsistency } from '@/hooks/useConsistency'
 
 export function BucketsPage() {
   const navigate = useNavigate()
   const { rows, loading } = useBucketPanorama()
+  const { result } = useConsistency()
 
   return (
     <AppShell>
-      <Eyebrow style={{ marginBottom: 6, display: 'block' }}>Your buckets</Eyebrow>
-      <p style={{ fontFamily: 'var(--font-voice)', fontSize: 22, fontWeight: 500, marginBottom: 24 }}>
-        The whole life, at a glance.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 24 }}>
+        <div>
+          <Eyebrow style={{ marginBottom: 6, display: 'block' }}>Your buckets</Eyebrow>
+          <p style={{ fontFamily: 'var(--font-voice)', fontSize: 22, fontWeight: 500 }}>
+            The whole life, at a glance.
+          </p>
+        </div>
+        {result && (
+          <div className="gpa-pill" title="Rolling 14-day consistency — what you committed to, parked buckets aside">
+            <span className="n">{result.lifeGpa != null ? result.lifeGpa.toFixed(1) : '—'}</span>
+            <span className="l">Life GPA</span>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)' }}>

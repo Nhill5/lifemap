@@ -8,6 +8,7 @@ import { MeterTile, type MeterData } from '@/components/ui/MeterTile'
 import { useBucketDetail, type ChiefGoalParams, type SubGoalParams } from '@/hooks/useBucketDetail'
 import { useProposals, type Proposal } from '@/hooks/useProposals'
 import { useChiefGoalProgress } from '@/hooks/useChiefGoalProgress'
+import { useConsistency } from '@/hooks/useConsistency'
 import { useToday } from '@/hooks/useToday'
 import { computePace } from '@/lib/pace'
 import { stateLabel } from '@/lib/accent'
@@ -384,6 +385,7 @@ export function BucketDetailPage() {
   const today = useToday()
   const detail = useBucketDetail(id)
   const proposals = useProposals(today)
+  const { result: consistency } = useConsistency()
 
   const [editingChief, setEditingChief] = useState(false)
   const [addingSub, setAddingSub]       = useState(false)
@@ -488,6 +490,18 @@ export function BucketDetailPage() {
                 </div>
               </div>
             )}
+
+            {(() => {
+              const score = consistency?.byBucket[bucket.id]
+              if (!score || score.pct == null) return null
+              return (
+                <div style={{ marginTop: 14, fontSize: 13, color: 'var(--text-dim)' }}>
+                  Consistency · 14-day:{' '}
+                  <b style={{ color: 'var(--text)' }}>{Math.round(score.pct * 100)}%</b>
+                  <span style={{ color: 'var(--text-faint)' }}> ({score.done}/{score.countable} committed)</span>
+                </div>
+              )
+            })()}
 
             <button
               onClick={() => setEditingChief(true)}
