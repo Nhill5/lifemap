@@ -1,9 +1,43 @@
+import { useEffect, type CSSProperties } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
+import { Button } from '@/components/ui/Button'
 import { useSettings } from '@/contexts/SettingsContext'
+import { useFitbit } from '@/hooks/useFitbit'
 import type { AccountabilityDial } from '@/types'
+
+function fmtSleep(min: number): string {
+  return `${Math.floor(min / 60)}h ${min % 60}m`
+}
+
+const cardStyle: CSSProperties = {
+  background: 'var(--surface)', border: '1px solid var(--line)',
+  borderRadius: 'var(--r-lg)', padding: '22px 24px', marginBottom: 16,
+}
+const labelStyle: CSSProperties = {
+  fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em',
+  color: 'var(--text-faint)', fontWeight: 600, marginBottom: 14,
+}
 
 export function SettingsPage() {
   const { settings, setSetting } = useSettings()
+  const fitbit = useFitbit()
+  const [params, setParams] = useSearchParams()
+
+  // Returning from the Fitbit OAuth callback (?fitbit=connected|error)
+  useEffect(() => {
+    const f = params.get('fitbit')
+    if (f === 'connected') { fitbit.refetch() }
+    if (f) { params.delete('fitbit'); setParams(params, { replace: true }) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const metricRows: { key: keyof typeof fitbit.metrics; label: string; fmt: (v: number) => string }[] = [
+    { key: 'steps', label: 'Steps', fmt: v => v.toLocaleString() },
+    { key: 'resting_hr', label: 'Resting HR', fmt: v => `${v} bpm` },
+    { key: 'sleep', label: 'Sleep', fmt: fmtSleep },
+    { key: 'active_minutes', label: 'Active', fmt: v => `${v} min` },
+  ]
 
   return (
     <AppShell>
@@ -100,6 +134,49 @@ export function SettingsPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Fitbit */}
+        <div style={cardStyle}>
+          <div style={labelStyle}>Fitbit</div>
+          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>
+            Auto-flows steps, sleep, resting HR, and active minutes. Weight feeds your
+            fitness chief-goal needle. Tokens are stored encrypted, server-side only.
+          </p>
+
+          {fitbit.error && (
+            <p style={{ fontSize: 13, color: 'var(--warm)', marginBottom: 12 }}>{fitbit.error}</p>
+          )}
+
+          {!fitbit.connected ? (
+            <Button variant="primary" onClick={fitbit.connect}>Connect Fitbit</Button>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14, color: 'var(--fitness)', fontWeight: 600 }}>✓ Connected</span>
+                {fitbit.connection?.last_sync_at && (
+                  <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+                    last synced {new Date(fitbit.connection.last_sync_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+
+              <div className="rail" style={{ marginBottom: 16 }}>
+                {metricRows.map(m => (
+                  <div key={m.key} className="meter" style={{ minWidth: 120 }}>
+                    <div className="info">
+                      <span className="v">{fitbit.metrics[m.key] != null ? m.fmt(fitbit.metrics[m.key]!) : '—'}</span>
+                      <span className="k">{m.label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button onClick={fitbit.sync} disabled={fitbit.syncing}>
+                {fitbit.syncing ? 'Syncing…' : 'Sync now'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </AppShell>

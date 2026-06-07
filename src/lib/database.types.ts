@@ -282,6 +282,27 @@ export type Database = {
         }
         Relationships: []
       }
+      fitbit_connections: {
+        Row: {
+          connected_at: string
+          last_sync_at: string | null
+          scopes: string | null
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          last_sync_at?: string | null
+          scopes?: string | null
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          last_sync_at?: string | null
+          scopes?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       fitbit_tokens: {
         Row: {
           access_token: string

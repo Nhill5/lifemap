@@ -181,6 +181,13 @@ export interface FitbitTokens {
   expires_at: string
 }
 
+export interface FitbitConnection {
+  user_id: string
+  connected_at: string
+  last_sync_at: string | null
+  scopes: string | null
+}
+
 export type FitbitMetric = 'steps' | 'sleep' | 'resting_hr' | 'active_minutes'
 
 export interface FitbitData {
