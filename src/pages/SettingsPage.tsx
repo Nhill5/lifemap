@@ -1,10 +1,14 @@
-import { useEffect, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useFitbit } from '@/hooks/useFitbit'
-import type { AccountabilityDial } from '@/types'
+import { useNotifications } from '@/hooks/useNotifications'
+import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
+import { NOTIFICATION_TYPES, DAILY_BUDGET } from '@/lib/notifications'
+import type { AccountabilityDial, NotificationType } from '@/types'
 
 function fmtSleep(min: number): string {
   return `${Math.floor(min / 60)}h ${min % 60}m`
@@ -38,6 +42,44 @@ export function SettingsPage() {
     { key: 'sleep', label: 'Sleep', fmt: fmtSleep },
     { key: 'active_minutes', label: 'Active', fmt: v => `${v} min` },
   ]
+
+  // Notifications
+  const { user } = useAuth()
+  const notif = useNotifications()
+  const [morning, setMorning] = useState('07:30')
+  const [evening, setEvening] = useState('21:00')
+  const [quietStart, setQuietStart] = useState('22:00')
+  const [quietEnd, setQuietEnd] = useState('07:00')
+  const [savedPrefs, setSavedPrefs] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    supabase.from('profiles').select('notification_windows, quiet_hours').eq('id', user.id).maybeSingle()
+      .then(({ data }) => {
+        const nw = (data?.notification_windows ?? null) as { morning_kickoff?: string; evening_mirror?: string } | null
+        const qh = (data?.quiet_hours ?? null) as { start?: string; end?: string } | null
+        if (nw?.morning_kickoff) setMorning(nw.morning_kickoff)
+        if (nw?.evening_mirror) setEvening(nw.evening_mirror)
+        if (qh?.start) setQuietStart(qh.start)
+        if (qh?.end) setQuietEnd(qh.end)
+      })
+  }, [user])
+
+  async function savePrefs() {
+    if (!user) return
+    await supabase.from('profiles').update({
+      notification_windows: { morning_kickoff: morning, evening_mirror: evening },
+      quiet_hours: { start: quietStart, end: quietEnd },
+    }).eq('id', user.id)
+    setSavedPrefs(true)
+    setTimeout(() => setSavedPrefs(false), 2000)
+  }
+
+  const timeInput: CSSProperties = {
+    background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--r-sm)',
+    padding: '7px 10px', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit',
+    outline: 'none', colorScheme: 'dark',
+  }
 
   return (
     <AppShell>
@@ -177,6 +219,66 @@ export function SettingsPage() {
               </Button>
             </>
           )}
+        </div>
+
+        {/* Notifications */}
+        <div style={cardStyle}>
+          <div style={labelStyle}>Notifications</div>
+          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>
+            At most {DAILY_BUDGET} a day — the app rations itself so it can't nag.
+            Install to your Home Screen for push on iOS.
+          </p>
+
+          {notif.error && <p style={{ fontSize: 13, color: 'var(--warm)', marginBottom: 12 }}>{notif.error}</p>}
+
+          {!notif.supported ? (
+            <p style={{ fontSize: 13, color: 'var(--text-faint)', marginBottom: 16 }}>
+              This browser doesn't support web push.
+            </p>
+          ) : notif.subscribed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 14, color: 'var(--fitness)', fontWeight: 600 }}>✓ Push enabled</span>
+              <Button onClick={notif.disable} disabled={notif.busy}>Turn off</Button>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 18 }}>
+              <Button variant="primary" onClick={notif.enable} disabled={notif.busy}>
+                {notif.busy ? 'Enabling…' : 'Enable notifications'}
+              </Button>
+            </div>
+          )}
+
+          {/* Timing windows */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <label style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              Morning kickoff
+              <input type="time" value={morning} onChange={e => setMorning(e.target.value)} style={{ ...timeInput, display: 'block', marginTop: 5, width: '100%', boxSizing: 'border-box' }} />
+            </label>
+            <label style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              Evening mirror
+              <input type="time" value={evening} onChange={e => setEvening(e.target.value)} style={{ ...timeInput, display: 'block', marginTop: 5, width: '100%', boxSizing: 'border-box' }} />
+            </label>
+            <label style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              Quiet hours start
+              <input type="time" value={quietStart} onChange={e => setQuietStart(e.target.value)} style={{ ...timeInput, display: 'block', marginTop: 5, width: '100%', boxSizing: 'border-box' }} />
+            </label>
+            <label style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              Quiet hours end
+              <input type="time" value={quietEnd} onChange={e => setQuietEnd(e.target.value)} style={{ ...timeInput, display: 'block', marginTop: 5, width: '100%', boxSizing: 'border-box' }} />
+            </label>
+          </div>
+          <Button onClick={savePrefs}>{savedPrefs ? 'Saved ✓' : 'Save timing'}</Button>
+
+          {/* What it spends the budget on */}
+          <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(Object.keys(NOTIFICATION_TYPES) as NotificationType[]).map(t => (
+              <div key={t} style={{ fontSize: 12.5, color: 'var(--text-faint)' }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{NOTIFICATION_TYPES[t].label}</span>
+                {' · '}<span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>{NOTIFICATION_TYPES[t].tone}</span>
+                {' — '}{NOTIFICATION_TYPES[t].desc}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </AppShell>

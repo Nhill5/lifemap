@@ -120,6 +120,7 @@ beforeAll(async () => {
   await admin.from('fitbit_tokens').insert({ user_id: uidA, access_token: 'tok_a', refresh_token: 'ref_a', expires_at: new Date(Date.now() + 3_600_000).toISOString() })
   await admin.from('fitbit_data').insert({ user_id: uidB, date: '2026-06-04', metric: 'steps', value: 9000 })
   await admin.from('fitbit_connections').insert({ user_id: uidB, scopes: 'activity weight' })
+  await admin.from('push_subscriptions').insert({ user_id: uidB, endpoint: `https://push.example/${TS}-b`, p256dh: 'p256dh_b', auth: 'auth_b' })
   await admin.from('journal_entries').insert({ user_id: uidB, date: '2026-06-04', scope: 'day', prompt: 'p', body: 'b' })
   await admin.from('events').insert({ user_id: uidB, type: 'task', weight: 1, payload: {} })
   await admin.from('unlocks').insert({ user_id: uidB, feature: 'week_zoom' })
@@ -148,7 +149,7 @@ describe('BOLA — User A cannot access User B data via PostgREST API', () => {
     'buckets', 'chief_goals', 'chief_goal_progress', 'sub_goals', 'tasks', 'blocks',
     'day_plans', 'track_logs', 'workouts',
     'fitbit_tokens', 'fitbit_data', 'fitbit_connections', 'journal_entries',
-    'events', 'unlocks', 'notifications_log',
+    'events', 'unlocks', 'notifications_log', 'push_subscriptions',
   ]
 
   for (const table of directTables) {
