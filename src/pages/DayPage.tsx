@@ -10,7 +10,14 @@ import { useProposals } from '@/hooks/useProposals'
 import { useToday, isoOffset, formatDateLabel } from '@/hooks/useToday'
 import { useClock, timeToMinutes, formatTimeRange } from '@/hooks/useClock'
 import { accent } from '@/lib/accent'
+import { weekdayOf, WEEKDAYS_MON_FIRST, RECUR_DAILY, RECUR_WEEKDAYS } from '@/lib/week'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Bucket } from '@/types'
+
+function sameSet(a: number[], b: number[]) {
+  return a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])
+}
 
 const HOUR_START = 6
 const HOUR_END   = 23
@@ -27,6 +34,12 @@ const inputStyle: CSSProperties = {
   borderRadius: 'var(--r-sm)', padding: '9px 12px', color: 'var(--text)',
   fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
   colorScheme: 'dark',
+}
+
+const pillBtn: CSSProperties = {
+  background: 'none', border: '1px solid var(--line)', borderRadius: 100,
+  padding: '4px 12px', fontSize: 12, fontWeight: 600, color: 'var(--text-dim)',
+  cursor: 'pointer', fontFamily: 'inherit',
 }
 
 /* ------------------------------------------------------------------ */
@@ -71,30 +84,46 @@ function TimeFields({ start, end, setStart, setEnd }: { start: string; end: stri
 /*  Add-block form — time is OPTIONAL (§25.4), untimed by default        */
 /* ------------------------------------------------------------------ */
 
+export interface AddSubmit {
+  title: string
+  bucketId: string | null
+  timed: boolean
+  start: string
+  end: string
+  isMajor: boolean
+  days: number[]   // empty = one-off; non-empty = recurring (requires a bucket)
+}
+
 interface AddBlockFormProps {
   buckets: Bucket[]
-  onAdd: (title: string, bucketId: string | null, start: string | null, end: string | null, isMajor: boolean) => Promise<void>
+  onSubmit: (p: AddSubmit) => Promise<void>
   onCancel: () => void
 }
 
-function AddBlockForm({ buckets, onAdd, onCancel }: AddBlockFormProps) {
+function AddBlockForm({ buckets, onSubmit, onCancel }: AddBlockFormProps) {
   const [title, setTitle]       = useState('')
   const [bucketId, setBucketId] = useState<string>('')
   const [timed, setTimed]       = useState(false)        // default: untimed to-do, never auto-stamped
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime]     = useState('10:00')
   const [isMajor, setIsMajor]     = useState(false)
+  const [days, setDays]           = useState<number[]>([])  // repeat
   const [saving, setSaving]       = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { titleRef.current?.focus() }, [])
 
+  const repeating = days.length > 0
+  const needsBucket = repeating && !bucketId
+  const toggleDay = (code: number) => setDays(d => d.includes(code) ? d.filter(x => x !== code) : [...d, code])
+
   async function handleAdd() {
     if (!title.trim()) return
     if (timed && (!startTime || !endTime)) return
+    if (needsBucket) return
     setSaving(true)
     try {
-      await onAdd(title.trim(), bucketId || null, timed ? startTime : null, timed ? endTime : null, isMajor)
+      await onSubmit({ title: title.trim(), bucketId: bucketId || null, timed, start: startTime, end: endTime, isMajor, days: [...days].sort() })
     } finally { setSaving(false) }
   }
 
@@ -105,18 +134,49 @@ function AddBlockForm({ buckets, onAdd, onCancel }: AddBlockFormProps) {
       <input ref={titleRef} value={title} onChange={e => setTitle(e.target.value)} placeholder="What is it?" maxLength={80} style={inputStyle} onKeyDown={e => e.key === 'Enter' && handleAdd()} />
 
       <select value={bucketId} onChange={e => setBucketId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
-        <option value="">No bucket (external)</option>
+        <option value="">{repeating ? 'Pick a bucket (required to repeat)' : 'No bucket (external)'}</option>
         {buckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
 
-      <ToggleRow value={timed} onChange={setTimed} label="Set a time" sub={timed ? 'a timed block' : 'untimed to-do for today'} />
+      <ToggleRow value={timed} onChange={setTimed} label="Set a time" sub={timed ? (repeating ? 'time it recurs at' : 'a timed block') : 'untimed to-do'} />
       {timed && <TimeFields start={startTime} end={endTime} setStart={setStartTime} setEnd={setEndTime} />}
 
-      <MajorToggleRow value={isMajor} onChange={setIsMajor} />
+      {/* Repeat — turns this into a recurring schedule-it sub-goal */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label style={{ fontSize: 11, color: 'var(--text-faint)' }}>Repeat</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {([
+            { label: 'None', active: !repeating, on: () => setDays([]) },
+            { label: 'Daily', active: sameSet(days, RECUR_DAILY), on: () => setDays([...RECUR_DAILY]) },
+            { label: 'Weekdays', active: sameSet(days, RECUR_WEEKDAYS), on: () => setDays([...RECUR_WEEKDAYS]) },
+          ]).map(p => (
+            <button key={p.label} type="button" onClick={p.on}
+              style={{ ...pillBtn, minHeight: 36, ...(p.active ? { borderColor: 'var(--work)', color: 'var(--text)', background: 'color-mix(in srgb, var(--work) 12%, var(--bg))' } : {}) }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {repeating && (
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            {WEEKDAYS_MON_FIRST.map(d => {
+              const on = days.includes(d.code)
+              return (
+                <button key={d.code} type="button" onClick={() => toggleDay(d.code)}
+                  style={{ ...pillBtn, padding: '6px 9px', minHeight: 36, ...(on ? { borderColor: 'var(--work)', color: 'var(--text)', background: 'color-mix(in srgb, var(--work) 14%, var(--bg))' } : {}) }}>
+                  {d.short}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {needsBucket && <p style={{ fontSize: 12, color: 'var(--warm)', margin: 0 }}>Pick a bucket — repeating items live in a bucket.</p>}
+      </div>
+
+      {!repeating && <MajorToggleRow value={isMajor} onChange={setIsMajor} />}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <Button variant="primary" disabled={!title.trim() || saving} onClick={handleAdd} style={{ flex: 1 }}>
-          {saving ? 'Adding…' : 'Add'}
+        <Button variant="primary" disabled={!title.trim() || saving || needsBucket} onClick={handleAdd} style={{ flex: 1 }}>
+          {saving ? 'Adding…' : repeating ? 'Add repeating' : 'Add'}
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
       </div>
@@ -199,6 +259,7 @@ export function DayPage() {
   const dateParam = params.get('date') ?? today
   const isToday = dateParam === today
 
+  const { user } = useAuth()
   const blocksHook = useBlocks(dateParam)
   const dayPlan = useDayPlan(dateParam)
   const proposals = useProposals(dateParam)
@@ -214,8 +275,47 @@ export function DayPage() {
     setParams(newDate === today ? {} : { date: newDate })
   }
 
-  async function handleAddBlock(title: string, bucketId: string | null, start: string | null, end: string | null, isMajor: boolean) {
-    await blocksHook.addBlock({ title, bucketId, startTime: start, endTime: end, isMajor })
+  // Repeat selected → create a recurring schedule-it sub-goal under the bucket,
+  // and drop today's occurrence in immediately if today matches.
+  async function createRecurringSubGoal(p: AddSubmit) {
+    if (!user || !p.bucketId) return
+    const { data: cg } = await supabase
+      .from('chief_goals').select('id').eq('bucket_id', p.bucketId).eq('status', 'active').maybeSingle()
+    const durationMin = p.timed ? Math.max(15, timeToMinutes(p.end) - timeToMinutes(p.start)) : null
+    const { data: sg } = await supabase.from('sub_goals').insert({
+      user_id: user.id,
+      bucket_id: p.bucketId,
+      chief_goal_id: cg?.id ?? null,
+      title: p.title,
+      type: 'schedule_it',
+      cadence_per_week: p.days.length,
+      recurrence_days: p.days,
+      recurrence_time: p.timed ? p.start : null,
+      recurrence_duration_min: durationMin,
+      data_source: 'manual',
+      status: 'active',
+    }).select('id').single()
+
+    if (sg && p.days.includes(weekdayOf(dateParam))) {
+      await supabase.from('blocks').insert({
+        user_id: user.id, sub_goal_id: sg.id, source: 'sub_goal', title: p.title,
+        date: dateParam, start_time: p.timed ? p.start : null, end_time: p.timed ? p.end : null, status: 'planned',
+      })
+    }
+  }
+
+  async function handleAdd(p: AddSubmit) {
+    if (p.days.length > 0 && p.bucketId) {
+      await createRecurringSubGoal(p)
+      blocksHook.refetch()
+      proposals.refetch()
+    } else {
+      await blocksHook.addBlock({
+        title: p.title, bucketId: p.bucketId,
+        startTime: p.timed ? p.start : null, endTime: p.timed ? p.end : null,
+        isMajor: p.isMajor,
+      })
+    }
     setShowAddForm(false)
   }
 
@@ -342,7 +442,7 @@ export function DayPage() {
           {/* Add */}
           {showAddForm ? (
             <div className="reveal" style={{ '--d': '0.1s', marginTop: 24 } as CSSProperties}>
-              <AddBlockForm buckets={buckets} onAdd={handleAddBlock} onCancel={() => setShowAddForm(false)} />
+              <AddBlockForm buckets={buckets} onSubmit={handleAdd} onCancel={() => setShowAddForm(false)} />
             </div>
           ) : (
             <button onClick={() => setShowAddForm(true)} style={{ width: '100%', marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'none', border: '1px dashed var(--line)', borderRadius: 'var(--r-md)', padding: '12px', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s', fontFamily: 'inherit' }}>
