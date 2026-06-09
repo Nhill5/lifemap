@@ -17,10 +17,11 @@ export const supabase = createClient<Database>(url, key, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storage: window.localStorage,
-    // Keep the default implicit flow: a magic link tapped on iOS opens Safari
-    // (a separate storage context from the standalone PWA), and implicit-flow
-    // tokens ride in the URL with no PKCE verifier to lose. Password login is
-    // the robust in-PWA path.
-    flowType: 'implicit',
+    // PKCE: the secure flow for a public SPA/PWA — auth code is exchanged
+    // server-side, no access/refresh tokens in the URL fragment. Password
+    // login (the primary in-PWA path) is unaffected by flowType. Magic-link /
+    // reset links complete in-browser via the stored code_verifier, so they
+    // work when the link is opened in the same browser the request came from.
+    flowType: 'pkce',
   },
 })
