@@ -19,6 +19,9 @@ export interface SubGoalParams {
   cadencePerWeek: number | null
   dailyTarget: number | null
   targetUnit: string | null
+  recurrenceDays: number[] | null   // schedule_it: 0=Sun..6=Sat; null = flexible cadence
+  recurrenceTime: string | null     // schedule_it: HH:MM; null = untimed
+  recurrenceDurationMin: number | null
 }
 
 export interface TrackToday {
@@ -139,15 +142,19 @@ export function useBucketDetail(bucketId: string | undefined): BucketDetail {
 
   async function addSubGoal(p: SubGoalParams) {
     if (!user || !bucketId) return
+    const schedule = p.type === 'schedule_it'
     await supabase.from('sub_goals').insert({
       user_id: user.id,
       bucket_id: bucketId,
       chief_goal_id: chiefGoal?.id ?? null,
       title: p.title,
       type: p.type,
-      cadence_per_week: p.type === 'schedule_it' ? p.cadencePerWeek : null,
+      cadence_per_week: schedule ? p.cadencePerWeek : null,
       daily_target: p.type === 'track_it' ? p.dailyTarget : null,
       target_unit: p.type === 'track_it' ? p.targetUnit : null,
+      recurrence_days: schedule ? p.recurrenceDays : null,
+      recurrence_time: schedule ? p.recurrenceTime : null,
+      recurrence_duration_min: schedule ? p.recurrenceDurationMin : null,
       data_source: 'manual',
       status: 'active',
     })
@@ -155,12 +162,16 @@ export function useBucketDetail(bucketId: string | undefined): BucketDetail {
   }
 
   async function editSubGoal(id: string, p: SubGoalParams) {
+    const schedule = p.type === 'schedule_it'
     await supabase.from('sub_goals').update({
       title: p.title,
       type: p.type,
-      cadence_per_week: p.type === 'schedule_it' ? p.cadencePerWeek : null,
+      cadence_per_week: schedule ? p.cadencePerWeek : null,
       daily_target: p.type === 'track_it' ? p.dailyTarget : null,
       target_unit: p.type === 'track_it' ? p.targetUnit : null,
+      recurrence_days: schedule ? p.recurrenceDays : null,
+      recurrence_time: schedule ? p.recurrenceTime : null,
+      recurrence_duration_min: schedule ? p.recurrenceDurationMin : null,
     }).eq('id', id)
     refetch()
   }

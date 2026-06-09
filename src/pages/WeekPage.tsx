@@ -331,7 +331,7 @@ export function WeekPage() {
                           {block.title}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>
-                          {formatTime(block.start_time)}
+                          {block.start_time ? formatTime(block.start_time) : 'Anytime'}
                         </div>
                       </div>
                     )

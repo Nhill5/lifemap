@@ -83,6 +83,9 @@ export interface SubGoal {
   target_unit: string | null
   data_source: DataSource
   status: GoalStatus
+  recurrence_days: number[] | null   // §25.5 — 0=Sun..6=Sat; null/empty = flexible cadence
+  recurrence_time: string | null     // HH:MM — null = untimed (generates a to-do)
+  recurrence_duration_min: number | null
   created_at: string
 }
 
@@ -108,8 +111,8 @@ export interface Block {
   source: BlockSource
   title: string
   date: string                      // ISO date
-  start_time: string                // HH:MM
-  end_time: string
+  start_time: string | null         // HH:MM — null = untimed (a to-do for the day)
+  end_time: string | null
   status: BlockStatus
 }
 

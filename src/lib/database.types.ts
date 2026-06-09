@@ -17,10 +17,10 @@ export type Database = {
       blocks: {
         Row: {
           date: string
-          end_time: string
+          end_time: string | null
           id: string
           source: Database["public"]["Enums"]["block_source"]
-          start_time: string
+          start_time: string | null
           status: Database["public"]["Enums"]["block_status"]
           sub_goal_id: string | null
           task_id: string | null
@@ -29,10 +29,10 @@ export type Database = {
         }
         Insert: {
           date: string
-          end_time: string
+          end_time?: string | null
           id?: string
           source: Database["public"]["Enums"]["block_source"]
-          start_time: string
+          start_time?: string | null
           status?: Database["public"]["Enums"]["block_status"]
           sub_goal_id?: string | null
           task_id?: string | null
@@ -41,10 +41,10 @@ export type Database = {
         }
         Update: {
           date?: string
-          end_time?: string
+          end_time?: string | null
           id?: string
           source?: Database["public"]["Enums"]["block_source"]
-          start_time?: string
+          start_time?: string | null
           status?: Database["public"]["Enums"]["block_status"]
           sub_goal_id?: string | null
           task_id?: string | null
@@ -459,6 +459,9 @@ export type Database = {
           daily_target: number | null
           data_source: Database["public"]["Enums"]["data_source"]
           id: string
+          recurrence_days: number[] | null
+          recurrence_duration_min: number | null
+          recurrence_time: string | null
           status: Database["public"]["Enums"]["goal_status"]
           target_unit: string | null
           title: string
@@ -473,6 +476,9 @@ export type Database = {
           daily_target?: number | null
           data_source?: Database["public"]["Enums"]["data_source"]
           id?: string
+          recurrence_days?: number[] | null
+          recurrence_duration_min?: number | null
+          recurrence_time?: string | null
           status?: Database["public"]["Enums"]["goal_status"]
           target_unit?: string | null
           title: string
@@ -487,6 +493,9 @@ export type Database = {
           daily_target?: number | null
           data_source?: Database["public"]["Enums"]["data_source"]
           id?: string
+          recurrence_days?: number[] | null
+          recurrence_duration_min?: number | null
+          recurrence_time?: string | null
           status?: Database["public"]["Enums"]["goal_status"]
           target_unit?: string | null
           title?: string

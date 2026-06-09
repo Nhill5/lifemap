@@ -4,7 +4,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { useToday, isoOffset, formatDateLabel } from '@/hooks/useToday'
-import { useClock, timeToMinutes, formatTime } from '@/hooks/useClock'
+import { useClock, timeToMinutes, formatTime, formatTimeRange } from '@/hooks/useClock'
 import { useBlocks, type RichBlock } from '@/hooks/useBlocks'
 import { useDayPlan } from '@/hooks/useDayPlan'
 import { useProposals, type Proposal } from '@/hooks/useProposals'
@@ -68,7 +68,7 @@ function TriageCard({ block, today, onCarry, onDrop }: TriageCardProps) {
             {block.title}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-            {formatTime(block.start_time)} – {formatTime(block.end_time)}
+            {formatTimeRange(block.start_time, block.end_time)}
             {block.bucket_name && (
               <span style={{ marginLeft: 7, color: c, fontWeight: 600 }}>· {block.bucket_name}</span>
             )}
@@ -156,7 +156,7 @@ function NextCard({ block, onClick }: { block: RichBlock; onClick: () => void })
       <div className="body">
         <div className="t">{block.title}</div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-          {formatTime(block.start_time)} – {formatTime(block.end_time)}
+          {formatTimeRange(block.start_time, block.end_time)}
         </div>
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-faint)' }}>›</div>
@@ -168,11 +168,13 @@ function NextCard({ block, onClick }: { block: RichBlock; onClick: () => void })
 /*  ProposalCard — a proposed block from a sub-goal cadence             */
 /* ------------------------------------------------------------------ */
 
-function ProposalCard({ proposal, onAccept }: { proposal: Proposal; onAccept: () => Promise<void> }) {
+function ProposalCard({ proposal, onAccept }: { proposal: Proposal; onAccept?: () => Promise<void> }) {
   const [working, setWorking] = useState(false)
   const c = proposal.bucketColor ? accent(proposal.bucketColor) : 'var(--text-faint)'
+  const preIncluded = proposal.fixedDay
 
   async function accept() {
+    if (!onAccept) return
     setWorking(true)
     try { await onAccept() } finally { setWorking(false) }
   }
@@ -196,14 +198,16 @@ function ProposalCard({ proposal, onAccept }: { proposal: Proposal; onAccept: ()
           {proposal.title}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-          {formatTime(proposal.startTime)} – {formatTime(proposal.endTime)}
+          {formatTimeRange(proposal.startTime, proposal.endTime)}
           {proposal.bucketName && <span style={{ marginLeft: 7, color: c, fontWeight: 600 }}>· {proposal.bucketName}</span>}
-          <span style={{ marginLeft: 7, color: 'var(--text-faint)' }}>
-            {proposal.scheduledThisWeek}/{proposal.cadence} this week
-          </span>
+          {!preIncluded && proposal.cadence > 0 && (
+            <span style={{ marginLeft: 7, color: 'var(--text-faint)' }}>{proposal.scheduledThisWeek}/{proposal.cadence} this week</span>
+          )}
         </div>
       </div>
-      <Button size="sm" variant="primary" onClick={accept}>Add</Button>
+      {preIncluded
+        ? <span style={{ fontSize: 12, color: c, fontWeight: 600, whiteSpace: 'nowrap' }}>✓ on commit</span>
+        : <Button size="sm" variant="primary" onClick={accept}>Add</Button>}
     </div>
   )
 }
@@ -239,24 +243,28 @@ export function NowPage() {
 
   const nowMinutes = timeToMinutes(clock)
 
+  // Only timed blocks drive Now/Next; untimed (to-dos) live on the Day.
+  const timedToday = todayHook.blocks.filter(b => b.start_time && b.end_time)
+  const untimedToday = todayHook.blocks.filter(b => !b.start_time)
+
   // Current block: overlaps with now, still actionable
-  const currentBlock = todayHook.blocks.find(b => {
+  const currentBlock = timedToday.find(b => {
     if (b.status === 'missed' || b.status === 'moved') return false
-    return timeToMinutes(b.start_time) <= nowMinutes && nowMinutes < timeToMinutes(b.end_time)
+    return timeToMinutes(b.start_time!) <= nowMinutes && nowMinutes < timeToMinutes(b.end_time!)
   }) ?? null
 
   // Future blocks: start after now, not missed/moved
-  const futureBlocks = todayHook.blocks.filter(b => {
+  const futureBlocks = timedToday.filter(b => {
     if (b.status === 'missed' || b.status === 'moved') return false
-    return timeToMinutes(b.start_time) > nowMinutes
+    return timeToMinutes(b.start_time!) > nowMinutes
   })
 
   // Triage: yesterday planned = never marked done or missed
   const triageBlocks = yesterdayHook.blocks.filter(b => b.status === 'planned')
 
   // Missed: planned but ended in the past
-  const missedBlocks = todayHook.blocks.filter(
-    b => b.status === 'planned' && timeToMinutes(b.end_time) < nowMinutes
+  const missedBlocks = timedToday.filter(
+    b => b.status === 'planned' && timeToMinutes(b.end_time!) < nowMinutes
   )
 
   const heroBlock = currentBlock ?? futureBlocks[0] ?? null
@@ -264,9 +272,16 @@ export function NowPage() {
 
   let progressPct = 0
   if (currentBlock) {
-    const start = timeToMinutes(currentBlock.start_time)
-    const end = timeToMinutes(currentBlock.end_time)
+    const start = timeToMinutes(currentBlock.start_time!)
+    const end = timeToMinutes(currentBlock.end_time!)
     progressPct = Math.min(100, Math.max(0, ((nowMinutes - start) / (end - start)) * 100))
+  }
+
+  // One commit brings in any pre-included fixed-day recurrences too (§25.5)
+  async function handleCommit() {
+    await proposals.materializeFixedDay(today)
+    todayHook.refetch()
+    await dayPlan.commit()
   }
 
   const isLoading = todayHook.loading || yesterdayHook.loading || dayPlan.loading
@@ -330,38 +345,49 @@ export function NowPage() {
         </div>
       )}
 
-      {/* Proposed from your goals — the proposal engine (spec §9) */}
-      {!dayPlan.isCommitted && proposals.proposals.length > 0 && (
+      {/* Proposed from your goals — the proposal engine (§9, §25.5) */}
+      {!dayPlan.isCommitted && (proposals.fixedDay.length > 0 || proposals.flexible.length > 0) && (
         <div className="reveal" style={{ '--d': '0.08s', marginBottom: 28 } as CSSProperties}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
-            <Eyebrow style={{ display: 'block' }}>
-              Proposed from your goals · {proposals.proposals.length}
-            </Eyebrow>
-            <button
-              onClick={async () => { await proposals.acceptAll(today); todayHook.refetch() }}
-              style={{
-                background: 'none', border: 'none', color: 'var(--work)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                fontFamily: 'inherit',
-              }}
-            >
-              Add all
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {proposals.proposals.map(p => (
-              <ProposalCard
-                key={p.subGoalId}
-                proposal={p}
-                onAccept={async () => { await proposals.accept(p, today); todayHook.refetch() }}
-              />
-            ))}
-          </div>
+          {/* Fixed-day recurrences — pre-included, brought in by a single commit */}
+          {proposals.fixedDay.length > 0 && (
+            <>
+              <Eyebrow style={{ marginBottom: 12, display: 'block' }}>
+                Recurring today · added on commit
+              </Eyebrow>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: proposals.flexible.length > 0 ? 22 : 0 }}>
+                {proposals.fixedDay.map(p => <ProposalCard key={p.subGoalId} proposal={p} />)}
+              </div>
+            </>
+          )}
+
+          {/* Flexible cadence — choose which days */}
+          {proposals.flexible.length > 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12 }}>
+                <Eyebrow style={{ display: 'block' }}>Suggested · pick days</Eyebrow>
+                <button
+                  onClick={async () => { await proposals.acceptMany(proposals.flexible, today); todayHook.refetch() }}
+                  style={{ background: 'none', border: 'none', color: 'var(--work)', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                >
+                  Add all
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {proposals.flexible.map(p => (
+                  <ProposalCard
+                    key={p.subGoalId}
+                    proposal={p}
+                    onAccept={async () => { await proposals.accept(p, today); todayHook.refetch() }}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* Morning planning prompt */}
-      {!dayPlan.isCommitted && !heroBlock && triageBlocks.length === 0 && proposals.proposals.length === 0 && (
+      {!dayPlan.isCommitted && !heroBlock && triageBlocks.length === 0 && proposals.proposals.length === 0 && untimedToday.length === 0 && (
         <div className="reveal propose" style={{ '--d': '0.1s' } as CSSProperties}>
           <p className="pp">
             Nothing on the schedule yet.<br />
@@ -375,8 +401,8 @@ export function NowPage() {
         </div>
       )}
 
-      {/* Commit nudge (blocks exist but not committed) */}
-      {!dayPlan.isCommitted && heroBlock && (
+      {/* Commit nudge — one commit also brings in pre-included recurrences */}
+      {!dayPlan.isCommitted && (todayHook.blocks.length > 0 || proposals.fixedDay.length > 0) && (
         <div
           className="reveal"
           style={{
@@ -393,9 +419,11 @@ export function NowPage() {
           } as CSSProperties}
         >
           <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>
-            Commit today's plan to lock it in
+            {proposals.fixedDay.length > 0
+              ? `Commit to lock in today — +${proposals.fixedDay.length} recurring`
+              : "Commit today's plan to lock it in"}
           </span>
-          <Button size="sm" variant="primary" onClick={dayPlan.commit} disabled={dayPlan.committing}>
+          <Button size="sm" variant="primary" onClick={handleCommit} disabled={dayPlan.committing}>
             {dayPlan.committing ? 'Committing…' : 'Commit'}
           </Button>
         </div>
@@ -416,9 +444,7 @@ export function NowPage() {
           <h1>{heroBlock.title}</h1>
 
           <div className="time">
-            <b>{formatTime(heroBlock.start_time)}</b>
-            {' – '}
-            {formatTime(heroBlock.end_time)}
+            {formatTimeRange(heroBlock.start_time, heroBlock.end_time)}
           </div>
 
           {currentBlock && (
@@ -429,7 +455,7 @@ export function NowPage() {
               <div className="progress-meta">
                 <span>{Math.round(progressPct)}% through</span>
                 <span>
-                  {Math.round(timeToMinutes(heroBlock.end_time) - nowMinutes)} min left
+                  {Math.round(timeToMinutes(currentBlock.end_time!) - nowMinutes)} min left
                 </span>
               </div>
             </>
@@ -545,6 +571,18 @@ export function NowPage() {
             }}
           >
             Review →
+          </button>
+        </div>
+      )}
+
+      {/* Untimed to-dos live on the Day */}
+      {untimedToday.length > 0 && (
+        <div style={{ marginTop: 24, textAlign: 'center' }}>
+          <button
+            onClick={() => navigate('/day')}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            {untimedToday.length} to-do{untimedToday.length === 1 ? '' : 's'} anytime today →
           </button>
         </div>
       )}

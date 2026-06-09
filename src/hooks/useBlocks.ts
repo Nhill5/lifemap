@@ -16,16 +16,16 @@ export interface RichBlock extends Omit<Block, 'sub_goal_id' | 'task_id'> {
 interface AddBlockParams {
   title: string
   bucketId: string | null
-  startTime: string
-  endTime: string
+  startTime: string | null   // null = untimed (a to-do for the day)
+  endTime: string | null
   isMajor?: boolean
 }
 
 export interface EditBlockParams {
   title: string
   bucketId: string | null
-  startTime: string
-  endTime: string
+  startTime: string | null
+  endTime: string | null
   isMajor: boolean
 }
 

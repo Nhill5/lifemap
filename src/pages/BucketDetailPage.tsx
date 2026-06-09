@@ -12,6 +12,22 @@ import { useConsistency } from '@/hooks/useConsistency'
 import { useToday } from '@/hooks/useToday'
 import { computePace } from '@/lib/pace'
 import { stateLabel } from '@/lib/accent'
+import { formatTime } from '@/hooks/useClock'
+import { WEEKDAYS_MON_FIRST, RECUR_DAILY, RECUR_WEEKDAYS } from '@/lib/week'
+
+function sameSet(a: number[], b: number[]) {
+  return a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])
+}
+
+/** Human label for a schedule-it sub-goal's recurrence. */
+function recurLabel(sub: SubGoal): string {
+  const d = sub.recurrence_days
+  if (!d || d.length === 0) return `${sub.cadence_per_week ?? 0}×/wk`
+  const base = sameSet(d, RECUR_DAILY) ? 'Daily'
+    : sameSet(d, RECUR_WEEKDAYS) ? 'Weekdays'
+    : WEEKDAYS_MON_FIRST.filter(w => d.includes(w.code)).map(w => w.short).join(', ')
+  return sub.recurrence_time ? `${base} · ${formatTime(sub.recurrence_time.slice(0, 5))}` : `${base} · untimed`
+}
 import type { ChiefGoal, SubGoal, SubGoalType } from '@/types'
 
 /* ------------------------------------------------------------------ */
@@ -198,18 +214,28 @@ function SubGoalForm({
   const [cadence, setCadence] = useState(initial?.cadence_per_week?.toString() ?? '3')
   const [target, setTarget]   = useState(initial?.daily_target?.toString() ?? '')
   const [unit, setUnit]       = useState(initial?.target_unit ?? '')
+  const [days, setDays]       = useState<number[]>(initial?.recurrence_days ?? [])
+  const [repeatTime, setRepeatTime] = useState(initial?.recurrence_time?.slice(0, 5) ?? '')
   const [saving, setSaving]   = useState(false)
+
+  const fixedDay = days.length > 0
+  const toggleDay = (code: number) => setDays(d => d.includes(code) ? d.filter(x => x !== code) : [...d, code])
 
   async function save() {
     if (!title.trim()) return
     setSaving(true)
     try {
+      const recurrenceTime = fixedDay && repeatTime ? repeatTime : null
       await onSave({
         title: title.trim(),
         type,
-        cadencePerWeek: type === 'schedule_it' ? (cadence.trim() === '' ? null : Number(cadence)) : null,
+        // fixed-day recurrence implies a weekly cadence = number of days
+        cadencePerWeek: type === 'schedule_it' ? (fixedDay ? days.length : (cadence.trim() === '' ? null : Number(cadence))) : null,
         dailyTarget: type === 'track_it' ? (target.trim() === '' ? null : Number(target)) : null,
         targetUnit: type === 'track_it' ? (unit.trim() || null) : null,
+        recurrenceDays: type === 'schedule_it' && fixedDay ? [...days].sort() : null,
+        recurrenceTime,
+        recurrenceDurationMin: recurrenceTime ? 60 : null,
       })
     } finally { setSaving(false) }
   }
@@ -257,9 +283,49 @@ function SubGoalForm({
       />
 
       {type === 'schedule_it' ? (
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>Times per week</label>
-          <input type="number" inputMode="numeric" min={1} max={21} value={cadence} onChange={e => setCadence(e.target.value)} style={inputStyle} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Repeat presets */}
+          <label style={{ fontSize: 11, color: 'var(--text-faint)' }}>Repeat</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {([
+              { label: 'None', active: !fixedDay, on: () => setDays([]) },
+              { label: 'Daily', active: sameSet(days, RECUR_DAILY), on: () => setDays([...RECUR_DAILY]) },
+              { label: 'Weekdays', active: sameSet(days, RECUR_WEEKDAYS), on: () => setDays([...RECUR_WEEKDAYS]) },
+            ]).map(p => (
+              <button key={p.label} onClick={p.on}
+                style={{ ...pillBtn, minHeight: 36, ...(p.active ? { borderColor: 'var(--work)', color: 'var(--text)', background: 'color-mix(in srgb, var(--work) 12%, var(--bg))' } : {}) }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Day chips (Monday-first display; canonical 0=Sun..6=Sat codes) — tap = Custom */}
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            {WEEKDAYS_MON_FIRST.map(d => {
+              const on = days.includes(d.code)
+              return (
+                <button key={d.code} onClick={() => toggleDay(d.code)}
+                  style={{ ...pillBtn, padding: '6px 9px', minHeight: 36,
+                    ...(on ? { borderColor: 'var(--work)', color: 'var(--text)', background: 'color-mix(in srgb, var(--work) 14%, var(--bg))' } : {}) }}>
+                  {d.short}
+                </button>
+              )
+            })}
+          </div>
+
+          {fixedDay ? (
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>
+                Time (optional — blank = untimed to-do)
+              </label>
+              <input type="time" value={repeatTime} onChange={e => setRepeatTime(e.target.value)} style={inputStyle} />
+            </div>
+          ) : (
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>Times per week (flexible — choose days at planning)</label>
+              <input type="number" inputMode="numeric" min={1} max={21} value={cadence} onChange={e => setCadence(e.target.value)} style={inputStyle} />
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -300,14 +366,13 @@ function ScheduleRow({
   onScheduleToday: (p: Proposal) => void
 }) {
   const [confirmDel, setConfirmDel] = useState(false)
-  const cadence = sub.cadence_per_week ?? 0
 
   return (
     <div style={rowStyle}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{sub.title}</div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-          {cadence}×/wk · {done} done, {scheduled} scheduled this week
+          {recurLabel(sub)} · {done} done, {scheduled} scheduled this week
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Eyebrow } from '@/components/ui/Eyebrow'
 import { VoiceLine } from '@/components/ui/VoiceLine'
 import { useToday, isoOffset, formatDateLabel } from '@/hooks/useToday'
-import { formatTime } from '@/hooks/useClock'
+import { formatTimeRange } from '@/hooks/useClock'
 import { useBlocks, type RichBlock } from '@/hooks/useBlocks'
 import { useTrackIt, type TrackItem } from '@/hooks/useTrackIt'
 import { useJournal } from '@/hooks/useJournal'
@@ -53,7 +53,7 @@ function BlockRow({ block, onToggle }: { block: RichBlock; onToggle: (missed: bo
           {block.title}
         </span>
         <span style={{ fontSize: 12, color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' }}>
-          {formatTime(block.start_time)} – {formatTime(block.end_time)}
+          {formatTimeRange(block.start_time, block.end_time)}
           {block.bucket_name && <span style={{ marginLeft: 6, color: missed ? 'var(--text-faint)' : c, fontWeight: 600 }}>· {block.bucket_name}</span>}
         </span>
       </span>

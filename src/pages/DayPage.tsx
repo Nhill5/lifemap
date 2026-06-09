@@ -6,17 +6,14 @@ import { Eyebrow } from '@/components/ui/Eyebrow'
 import { useBuckets } from '@/hooks/useBuckets'
 import { useBlocks, type RichBlock, type EditBlockParams } from '@/hooks/useBlocks'
 import { useDayPlan } from '@/hooks/useDayPlan'
+import { useProposals } from '@/hooks/useProposals'
 import { useToday, isoOffset, formatDateLabel } from '@/hooks/useToday'
-import { useClock, timeToMinutes, formatTime } from '@/hooks/useClock'
+import { useClock, timeToMinutes, formatTimeRange } from '@/hooks/useClock'
 import { accent } from '@/lib/accent'
 import type { Bucket } from '@/types'
 
-/* ------------------------------------------------------------------ */
-/*  Timeline constants                                                  */
-/* ------------------------------------------------------------------ */
-
-const HOUR_START = 6   // 6 AM
-const HOUR_END   = 23  // 11 PM
+const HOUR_START = 6
+const HOUR_END   = 23
 const HOURS = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START)
 
 function formatHour(h: number): string {
@@ -24,10 +21,6 @@ function formatHour(h: number): string {
   if (h === 0)  return '12 AM'
   return h > 12 ? `${h - 12} PM` : `${h} AM`
 }
-
-/* ------------------------------------------------------------------ */
-/*  Shared input style                                                  */
-/* ------------------------------------------------------------------ */
 
 const inputStyle: CSSProperties = {
   width: '100%', background: 'var(--bg)', border: '1px solid var(--line)',
@@ -37,47 +30,57 @@ const inputStyle: CSSProperties = {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Major-task toggle — large tap target for mobile                     */
+/*  Generic toggle row — 44px tap target                                */
 /* ------------------------------------------------------------------ */
 
-function MajorToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ value, onChange, label, sub }: { value: boolean; onChange: (v: boolean) => void; label: string; sub?: string }) {
   return (
     <label
       style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '11px 12px', minHeight: 44, boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', minHeight: 44, boxSizing: 'border-box',
         background: value ? 'color-mix(in srgb, var(--work) 12%, var(--bg))' : 'var(--bg)',
         border: `1px solid ${value ? 'color-mix(in srgb, var(--work) 45%, transparent)' : 'var(--line)'}`,
-        borderRadius: 'var(--r-sm)', cursor: 'pointer',
-        transition: 'background 0.15s, border-color 0.15s',
+        borderRadius: 'var(--r-sm)', cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s',
       }}
     >
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={e => onChange(e.target.checked)}
-        style={{ width: 20, height: 20, accentColor: 'var(--work)', cursor: 'pointer', flexShrink: 0 }}
-      />
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        style={{ width: 20, height: 20, accentColor: 'var(--work)', cursor: 'pointer', flexShrink: 0 }} />
       <span style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.3 }}>
-        Major task <span style={{ color: 'var(--text-dim)' }}>— plan at week level</span>
+        {label}{sub && <span style={{ color: 'var(--text-dim)' }}> — {sub}</span>}
       </span>
     </label>
   )
 }
 
+function TimeFields({ start, end, setStart, setEnd }: { start: string; end: string; setStart: (v: string) => void; setEnd: (v: string) => void }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>Start</label>
+        <input type="time" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} />
+      </div>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>End</label>
+        <input type="time" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} />
+      </div>
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------------ */
-/*  Add-block form                                                      */
+/*  Add-block form — time is OPTIONAL (§25.4), untimed by default        */
 /* ------------------------------------------------------------------ */
 
 interface AddBlockFormProps {
   buckets: Bucket[]
-  onAdd: (title: string, bucketId: string | null, start: string, end: string, isMajor: boolean) => Promise<void>
+  onAdd: (title: string, bucketId: string | null, start: string | null, end: string | null, isMajor: boolean) => Promise<void>
   onCancel: () => void
 }
 
 function AddBlockForm({ buckets, onAdd, onCancel }: AddBlockFormProps) {
   const [title, setTitle]       = useState('')
   const [bucketId, setBucketId] = useState<string>('')
+  const [timed, setTimed]       = useState(false)        // default: untimed to-do, never auto-stamped
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime]     = useState('10:00')
   const [isMajor, setIsMajor]     = useState(false)
@@ -87,76 +90,42 @@ function AddBlockForm({ buckets, onAdd, onCancel }: AddBlockFormProps) {
   useEffect(() => { titleRef.current?.focus() }, [])
 
   async function handleAdd() {
-    if (!title.trim() || !startTime || !endTime) return
+    if (!title.trim()) return
+    if (timed && (!startTime || !endTime)) return
     setSaving(true)
     try {
-      await onAdd(title.trim(), bucketId || null, startTime, endTime, isMajor)
-    } finally {
-      setSaving(false)
-    }
+      await onAdd(title.trim(), bucketId || null, timed ? startTime : null, timed ? endTime : null, isMajor)
+    } finally { setSaving(false) }
   }
 
   return (
-    <div
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--line-strong)',
-        borderRadius: 'var(--r-md)',
-        padding: '18px 18px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}
-    >
-      <Eyebrow style={{ marginBottom: 4 }}>Add block</Eyebrow>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line-strong)', borderRadius: 'var(--r-md)', padding: '18px 18px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <Eyebrow style={{ marginBottom: 4 }}>Add to today</Eyebrow>
 
-      <input
-        ref={titleRef}
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        placeholder="Block title"
-        maxLength={80}
-        style={inputStyle}
-        onKeyDown={e => e.key === 'Enter' && handleAdd()}
-      />
+      <input ref={titleRef} value={title} onChange={e => setTitle(e.target.value)} placeholder="What is it?" maxLength={80} style={inputStyle} onKeyDown={e => e.key === 'Enter' && handleAdd()} />
 
-      <select
-        value={bucketId}
-        onChange={e => setBucketId(e.target.value)}
-        style={{ ...inputStyle, cursor: 'pointer' }}
-      >
+      <select value={bucketId} onChange={e => setBucketId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
         <option value="">No bucket (external)</option>
-        {buckets.map(b => (
-          <option key={b.id} value={b.id}>{b.name}</option>
-        ))}
+        {buckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>Start</label>
-          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inputStyle} />
-        </div>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>End</label>
-          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={inputStyle} />
-        </div>
-      </div>
+      <ToggleRow value={timed} onChange={setTimed} label="Set a time" sub={timed ? 'a timed block' : 'untimed to-do for today'} />
+      {timed && <TimeFields start={startTime} end={endTime} setStart={setStartTime} setEnd={setEndTime} />}
 
-      <MajorToggle value={isMajor} onChange={setIsMajor} />
+      <MajorToggleRow value={isMajor} onChange={setIsMajor} />
 
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <Button
-          variant="primary"
-          disabled={!title.trim() || saving}
-          onClick={handleAdd}
-          style={{ flex: 1 }}
-        >
-          {saving ? 'Adding…' : 'Add block'}
+        <Button variant="primary" disabled={!title.trim() || saving} onClick={handleAdd} style={{ flex: 1 }}>
+          {saving ? 'Adding…' : 'Add'}
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
       </div>
     </div>
   )
+}
+
+function MajorToggleRow({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return <ToggleRow value={value} onChange={onChange} label="Major task" sub="plan at week level" />
 }
 
 /* ------------------------------------------------------------------ */
@@ -174,8 +143,9 @@ interface InlineEditFormProps {
 function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditFormProps) {
   const [title, setTitle]         = useState(block.title)
   const [bucketId, setBucketId]   = useState<string>(block.bucket_id ?? '')
-  const [startTime, setStartTime] = useState(block.start_time)
-  const [endTime, setEndTime]     = useState(block.end_time)
+  const [timed, setTimed]         = useState(!!block.start_time)
+  const [startTime, setStartTime] = useState(block.start_time ?? '09:00')
+  const [endTime, setEndTime]     = useState(block.end_time ?? '10:00')
   const [isMajor, setIsMajor]     = useState(block.is_major)
   const [saving, setSaving]       = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
@@ -184,67 +154,31 @@ function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditF
 
   async function handleSave() {
     if (!title.trim()) return
+    if (timed && (!startTime || !endTime)) return
     setSaving(true)
     try {
-      await onSave({ title: title.trim(), bucketId: bucketId || null, startTime, endTime, isMajor })
-    } finally {
-      setSaving(false)
-    }
+      await onSave({ title: title.trim(), bucketId: bucketId || null, startTime: timed ? startTime : null, endTime: timed ? endTime : null, isMajor })
+    } finally { setSaving(false) }
   }
 
   return (
-    <div
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--line-strong)',
-        borderRadius: 'var(--r-md)',
-        padding: '14px 14px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        ...style,
-      }}
-    >
-      <Eyebrow style={{ marginBottom: 2 }}>Edit block</Eyebrow>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line-strong)', borderRadius: 'var(--r-md)', padding: '14px 14px 12px', display: 'flex', flexDirection: 'column', gap: 8, ...style }}>
+      <Eyebrow style={{ marginBottom: 2 }}>Edit</Eyebrow>
 
-      <input
-        ref={titleRef}
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        placeholder="Block title"
-        maxLength={80}
-        style={inputStyle}
-        onKeyDown={e => e.key === 'Enter' && handleSave()}
-      />
+      <input ref={titleRef} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" maxLength={80} style={inputStyle} onKeyDown={e => e.key === 'Enter' && handleSave()} />
 
-      <select
-        value={bucketId}
-        onChange={e => setBucketId(e.target.value)}
-        style={{ ...inputStyle, cursor: 'pointer' }}
-      >
+      <select value={bucketId} onChange={e => setBucketId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
         <option value="">No bucket</option>
-        {buckets.map(b => (
-          <option key={b.id} value={b.id}>{b.name}</option>
-        ))}
+        {buckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>Start</label>
-          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inputStyle} />
-        </div>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>End</label>
-          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={inputStyle} />
-        </div>
-      </div>
+      <ToggleRow value={timed} onChange={setTimed} label="Set a time" sub={timed ? 'a timed block' : 'untimed to-do'} />
+      {timed && <TimeFields start={startTime} end={endTime} setStart={setStartTime} setEnd={setEndTime} />}
 
-      <MajorToggle value={isMajor} onChange={setIsMajor} />
+      <MajorToggleRow value={isMajor} onChange={setIsMajor} />
 
       <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-        <Button variant="primary" disabled={!title.trim() || saving} onClick={handleSave} style={{ flex: 1 }}>
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
+        <Button variant="primary" disabled={!title.trim() || saving} onClick={handleSave} style={{ flex: 1 }}>{saving ? 'Saving…' : 'Save'}</Button>
         <Button onClick={onCancel}>Cancel</Button>
       </div>
     </div>
@@ -262,200 +196,142 @@ export function DayPage() {
   const clock = useClock()
   const nowMinutes = timeToMinutes(clock)
 
-  // date from URL or today
   const dateParam = params.get('date') ?? today
   const isToday = dateParam === today
 
   const blocksHook = useBlocks(dateParam)
   const dayPlan = useDayPlan(dateParam)
+  const proposals = useProposals(dateParam)
   const buckets = useBuckets()
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId]     = useState<string | null>(null)
   const [deletingId, setDeletingId]   = useState<string | null>(null)
+  const [committing, setCommitting]   = useState(false)
 
   function navigate_date(offset: number) {
     const newDate = isoOffset(dateParam, offset)
     setParams(newDate === today ? {} : { date: newDate })
   }
 
-  async function handleAddBlock(title: string, bucketId: string | null, start: string, end: string, isMajor: boolean) {
+  async function handleAddBlock(title: string, bucketId: string | null, start: string | null, end: string | null, isMajor: boolean) {
     await blocksHook.addBlock({ title, bucketId, startTime: start, endTime: end, isMajor })
     setShowAddForm(false)
   }
 
-  // Bucket lookup by id
-  const bucketById = Object.fromEntries(buckets.map(b => [b.id, b]))
+  // A single commit brings in any pre-included fixed-day recurrences too (§25.5)
+  async function handleCommit() {
+    setCommitting(true)
+    try {
+      await proposals.materializeFixedDay(dateParam)
+      blocksHook.refetch()
+      await dayPlan.commit()
+    } finally { setCommitting(false) }
+  }
 
+  const bucketById = Object.fromEntries(buckets.map(b => [b.id, b]))
   const isLoading = blocksHook.loading || dayPlan.loading
+
+  const timedBlocks = blocksHook.blocks.filter(b => b.start_time)
+  const untimedBlocks = blocksHook.blocks.filter(b => !b.start_time)
+  const fixedDayCount = proposals.fixedDay.length
+
+  /* Renders a block as either the inline editor or a card (timed or untimed). */
+  function renderBlock(block: RichBlock, style: CSSProperties) {
+    if (editingId === block.id) {
+      return (
+        <InlineEditForm
+          key={block.id}
+          block={block}
+          buckets={buckets}
+          onSave={async (p) => { await blocksHook.editBlock(block, p); setEditingId(null) }}
+          onCancel={() => setEditingId(null)}
+          style={style}
+        />
+      )
+    }
+    const c = block.bucket_color ? accent(block.bucket_color) : 'var(--text-faint)'
+    const bucket = block.bucket_id ? bucketById[block.bucket_id] : null
+    const isCurrent = isToday && !!block.start_time && !!block.end_time &&
+      timeToMinutes(block.start_time) <= nowMinutes && nowMinutes < timeToMinutes(block.end_time)
+
+    return (
+      <div key={block.id} className={`tl-block ${block.status} ${isCurrent ? 'now' : ''}`} style={{ '--c': c, ...style } as CSSProperties}>
+        {bucket && <div className="bk">{bucket.name}</div>}
+        <div className="bt">{block.title}</div>
+        <div className="bs">{formatTimeRange(block.start_time, block.end_time)}</div>
+
+        {block.status === 'planned' && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'done') }} style={blockActionBtn}>Done ✓</button>
+            <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'missed') }} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Missed</button>
+          </div>
+        )}
+        {block.status === 'done' && (
+          <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'planned') }} style={{ ...blockActionBtn, marginTop: 8 }}>Undo</button>
+        )}
+
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+          <button onClick={e => { e.stopPropagation(); setEditingId(block.id); setDeletingId(null) }} style={blockActionBtn}>Edit</button>
+          {deletingId === block.id ? (
+            <>
+              <span style={{ fontSize: 11, color: 'var(--text-faint)', alignSelf: 'center' }}>Drop?</span>
+              <button onClick={async e => { e.stopPropagation(); setDeletingId(null); await blocksHook.dropBlock(block) }} style={{ ...blockActionBtn, color: 'var(--warm)' }}>Yes</button>
+              <button onClick={e => { e.stopPropagation(); setDeletingId(null) }} style={blockActionBtn}>No</button>
+            </>
+          ) : (
+            <button onClick={e => { e.stopPropagation(); setDeletingId(block.id); setEditingId(null) }} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Delete</button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <AppShell>
       {/* Date navigation */}
-      <div
-        className="reveal"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginBottom: 28, '--d': '0s',
-        } as CSSProperties}
-      >
-        <button
-          onClick={() => navigate_date(-1)}
-          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 22, cursor: 'pointer', padding: '4px 8px' }}
-          aria-label="Previous day"
-        >‹</button>
-
+      <div className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, '--d': '0s' } as CSSProperties}>
+        <button onClick={() => navigate_date(-1)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 22, cursor: 'pointer', padding: '4px 8px' }} aria-label="Previous day">‹</button>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-voice)', fontSize: 20, fontWeight: 500 }}>
-            {isToday ? 'Today' : formatDateLabel(dateParam)}
-          </div>
-          {isToday && (
-            <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>
-              {formatDateLabel(today)}
-            </div>
-          )}
+          <div style={{ fontFamily: 'var(--font-voice)', fontSize: 20, fontWeight: 500 }}>{isToday ? 'Today' : formatDateLabel(dateParam)}</div>
+          {isToday && <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>{formatDateLabel(today)}</div>}
         </div>
-
-        <button
-          onClick={() => navigate_date(1)}
-          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 22, cursor: 'pointer', padding: '4px 8px' }}
-          aria-label="Next day"
-        >›</button>
+        <button onClick={() => navigate_date(1)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 22, cursor: 'pointer', padding: '4px 8px' }} aria-label="Next day">›</button>
       </div>
 
       {isLoading ? (
-        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)' }}>
-          Loading…
-        </div>
+        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)' }}>Loading…</div>
       ) : (
         <>
-          {/* Timeline */}
+          {/* Anytime today — untimed to-dos */}
+          {untimedBlocks.length > 0 && (
+            <div className="reveal" style={{ marginBottom: 18, '--d': '0.04s' } as CSSProperties}>
+              <Eyebrow style={{ marginBottom: 10, display: 'block' }}>Anytime today</Eyebrow>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {untimedBlocks.map(b => renderBlock(b, {}))}
+              </div>
+            </div>
+          )}
+
+          {/* Timeline — timed blocks */}
           <div className="day-wrap reveal" style={{ '--d': '0.06s' } as CSSProperties}>
             <div className="tl">
               {HOURS.map(hour => {
-                const hourBlocks = blocksHook.blocks.filter(
-                  b => Math.floor(timeToMinutes(b.start_time) / 60) === hour
-                )
-                // Now-line: render it at the top of the current hour row
+                const hourBlocks = timedBlocks.filter(b => Math.floor(timeToMinutes(b.start_time!) / 60) === hour)
                 const showNowLine = isToday && Math.floor(nowMinutes / 60) === hour
-
                 return (
                   <div key={hour} className="tl-row" style={{ minHeight: 56 + hourBlocks.length * 68 }}>
                     <div className="tl-hour">{formatHour(hour)}</div>
                     <div className="tl-track">
                       {showNowLine && (
-                        <div
-                          className="now-line"
-                          style={{ top: `${((nowMinutes % 60) / 60) * 56}px`, position: 'absolute', left: 0, right: 0 }}
-                        >
+                        <div className="now-line" style={{ top: `${((nowMinutes % 60) / 60) * 56}px`, position: 'absolute', left: 0, right: 0 }}>
                           <div className="now-lbl">NOW</div>
                         </div>
                       )}
-                      {hourBlocks.map((block, i) => {
-                        const c = block.bucket_color ? accent(block.bucket_color) : 'var(--text-faint)'
-                        const bucket = block.bucket_id ? bucketById[block.bucket_id] : null
-                        const isCurrentBlock = isToday &&
-                          timeToMinutes(block.start_time) <= nowMinutes &&
-                          nowMinutes < timeToMinutes(block.end_time)
-
-                        const blockMargin: CSSProperties = {
-                          position: 'relative',
-                          left: 0,
-                          right: 0,
-                          top: 0,
-                          margin: `${i === 0 ? 4 : 0}px 8px ${i < hourBlocks.length - 1 ? 6 : 4}px`,
-                        }
-
-                        if (editingId === block.id) {
-                          return (
-                            <InlineEditForm
-                              key={block.id}
-                              block={block}
-                              buckets={buckets}
-                              onSave={async (p) => {
-                                await blocksHook.editBlock(block, p)
-                                setEditingId(null)
-                              }}
-                              onCancel={() => setEditingId(null)}
-                              style={blockMargin}
-                            />
-                          )
-                        }
-
-                        return (
-                          <div
-                            key={block.id}
-                            className={`tl-block ${block.status} ${isCurrentBlock ? 'now' : ''}`}
-                            style={{ '--c': c, ...blockMargin } as CSSProperties}
-                          >
-                            {bucket && <div className="bk">{bucket.name}</div>}
-                            <div className="bt">{block.title}</div>
-                            <div className="bs">
-                              {formatTime(block.start_time)} – {formatTime(block.end_time)}
-                            </div>
-
-                            {/* Status actions */}
-                            {block.status === 'planned' && (
-                              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                                <button
-                                  onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'done') }}
-                                  style={blockActionBtn}
-                                >
-                                  Done ✓
-                                </button>
-                                <button
-                                  onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'missed') }}
-                                  style={{ ...blockActionBtn, color: 'var(--text-faint)' }}
-                                >
-                                  Missed
-                                </button>
-                              </div>
-                            )}
-                            {block.status === 'done' && (
-                              <button
-                                onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'planned') }}
-                                style={{ ...blockActionBtn, marginTop: 8 }}
-                              >
-                                Undo
-                              </button>
-                            )}
-
-                            {/* Edit + Delete */}
-                            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                              <button
-                                onClick={e => { e.stopPropagation(); setEditingId(block.id); setDeletingId(null) }}
-                                style={blockActionBtn}
-                              >
-                                Edit
-                              </button>
-                              {deletingId === block.id ? (
-                                <>
-                                  <span style={{ fontSize: 11, color: 'var(--text-faint)', alignSelf: 'center' }}>Drop?</span>
-                                  <button
-                                    onClick={async e => { e.stopPropagation(); setDeletingId(null); await blocksHook.dropBlock(block) }}
-                                    style={{ ...blockActionBtn, color: 'var(--warm)' }}
-                                  >
-                                    Yes
-                                  </button>
-                                  <button
-                                    onClick={e => { e.stopPropagation(); setDeletingId(null) }}
-                                    style={blockActionBtn}
-                                  >
-                                    No
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  onClick={e => { e.stopPropagation(); setDeletingId(block.id); setEditingId(null) }}
-                                  style={{ ...blockActionBtn, color: 'var(--text-faint)' }}
-                                >
-                                  Delete
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
+                      {hourBlocks.map((block, i) => renderBlock(block, {
+                        position: 'relative', left: 0, right: 0, top: 0,
+                        margin: `${i === 0 ? 4 : 0}px 8px ${i < hourBlocks.length - 1 ? 6 : 4}px`,
+                      }))}
                     </div>
                   </div>
                 )
@@ -463,118 +339,57 @@ export function DayPage() {
             </div>
           </div>
 
-          {/* Add block */}
+          {/* Add */}
           {showAddForm ? (
             <div className="reveal" style={{ '--d': '0.1s', marginTop: 24 } as CSSProperties}>
-              <AddBlockForm
-                buckets={buckets}
-                onAdd={handleAddBlock}
-                onCancel={() => setShowAddForm(false)}
-              />
+              <AddBlockForm buckets={buckets} onAdd={handleAddBlock} onCancel={() => setShowAddForm(false)} />
             </div>
           ) : (
-            <button
-              onClick={() => setShowAddForm(true)}
-              style={{
-                width: '100%', marginTop: 20,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                background: 'none', border: '1px dashed var(--line)',
-                borderRadius: 'var(--r-md)', padding: '12px',
-                color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer',
-                transition: 'border-color 0.15s, color 0.15s',
-                fontFamily: 'inherit',
-              }}
-            >
+            <button onClick={() => setShowAddForm(true)} style={{ width: '100%', marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'none', border: '1px dashed var(--line)', borderRadius: 'var(--r-md)', padding: '12px', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s', fontFamily: 'inherit' }}>
               <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
-              Add block
+              Add to today
             </button>
           )}
 
-          {/* Commit strip */}
-          {!dayPlan.isCommitted && blocksHook.blocks.length > 0 && (
-            <div
-              className="reveal"
-              style={{
-                '--d': '0.15s',
-                marginTop: 28,
-                padding: '18px 22px',
-                background: 'linear-gradient(150deg, color-mix(in srgb, var(--fitness) 10%, var(--surface)), var(--surface))',
-                border: '1px solid color-mix(in srgb, var(--fitness) 22%, transparent)',
-                borderRadius: 'var(--r-md)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 16,
-              } as CSSProperties}
-            >
+          {/* Commit strip — also brings in pre-included recurrences */}
+          {!dayPlan.isCommitted && (blocksHook.blocks.length > 0 || fixedDayCount > 0) && (
+            <div className="reveal" style={{ '--d': '0.15s', marginTop: 28, padding: '18px 22px', background: 'linear-gradient(150deg, color-mix(in srgb, var(--fitness) 10%, var(--surface)), var(--surface))', border: '1px solid color-mix(in srgb, var(--fitness) 22%, transparent)', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 } as CSSProperties}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 15 }}>
-                  {blocksHook.blocks.length} block{blocksHook.blocks.length > 1 ? 's' : ''} planned
+                  {blocksHook.blocks.length} item{blocksHook.blocks.length === 1 ? '' : 's'} planned
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
-                  Commit to make it real.
+                  {fixedDayCount > 0 ? `+${fixedDayCount} recurring will be added on commit.` : 'Commit to make it real.'}
                 </div>
               </div>
-              <Button
-                variant="primary"
-                onClick={dayPlan.commit}
-                disabled={dayPlan.committing}
-              >
-                {dayPlan.committing ? 'Committing…' : 'Commit day ✓'}
+              <Button variant="primary" onClick={handleCommit} disabled={committing}>
+                {committing ? 'Committing…' : 'Commit day ✓'}
               </Button>
             </div>
           )}
 
           {dayPlan.isCommitted && (
-            <div
-              className="reveal"
-              style={{
-                '--d': '0.15s',
-                marginTop: 28,
-                textAlign: 'center',
-                padding: '12px',
-                fontSize: 13,
-                color: 'var(--text-faint)',
-              } as CSSProperties}
-            >
-              ✓ Plan committed · {blocksHook.blocks.length} block{blocksHook.blocks.length > 1 ? 's' : ''}
+            <div className="reveal" style={{ '--d': '0.15s', marginTop: 28, textAlign: 'center', padding: '12px', fontSize: 13, color: 'var(--text-faint)' } as CSSProperties}>
+              ✓ Plan committed · {blocksHook.blocks.length} item{blocksHook.blocks.length === 1 ? '' : 's'}
             </div>
           )}
 
           {/* Empty state */}
-          {!showAddForm && blocksHook.blocks.length === 0 && (
-            <div
-              className="reveal"
-              style={{
-                '--d': '0.1s',
-                textAlign: 'center',
-                marginTop: 60,
-                color: 'var(--text-faint)',
-                fontSize: 14,
-              } as CSSProperties}
-            >
+          {!showAddForm && blocksHook.blocks.length === 0 && fixedDayCount === 0 && (
+            <div className="reveal" style={{ '--d': '0.1s', textAlign: 'center', marginTop: 60, color: 'var(--text-faint)', fontSize: 14 } as CSSProperties}>
               Nothing planned {isToday ? 'today' : 'for this day'}.
               <br />
-              <button
-                onClick={() => setShowAddForm(true)}
-                style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}
-              >
-                Add your first block →
+              <button onClick={() => setShowAddForm(true)} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit' }}>
+                Add your first thing →
               </button>
             </div>
           )}
         </>
       )}
 
-      {/* Quick nav to Now */}
       {!isToday && (
         <div style={{ marginTop: 32, textAlign: 'center' }}>
-          <button
-            onClick={() => navigate('/now')}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            ← Back to Now
-          </button>
+          <button onClick={() => navigate('/now')} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>← Back to Now</button>
         </div>
       )}
     </AppShell>
@@ -582,13 +397,7 @@ export function DayPage() {
 }
 
 const blockActionBtn: CSSProperties = {
-  background: 'none',
-  border: '1px solid var(--line)',
-  borderRadius: 100,
-  padding: '3px 10px',
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'var(--text-dim)',
-  cursor: 'pointer',
-  fontFamily: 'inherit',
+  background: 'none', border: '1px solid var(--line)', borderRadius: 100,
+  padding: '3px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)',
+  cursor: 'pointer', fontFamily: 'inherit',
 }

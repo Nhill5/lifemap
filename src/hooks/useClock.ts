@@ -41,3 +41,16 @@ export function formatTime(hhmm: string): string {
   const hh = h % 12 || 12
   return `${hh}:${String(m).padStart(2, '0')} ${ap}`
 }
+
+/** Null-safe range for blocks that may be untimed (§25.4). */
+export function formatTimeRange(start: string | null, end: string | null): string {
+  if (!start) return 'Anytime'
+  return end ? `${formatTime(start)} – ${formatTime(end)}` : formatTime(start)
+}
+
+export function addMinutes(hhmm: string, mins: number): string {
+  const total = timeToMinutes(hhmm) + mins
+  const h = Math.floor(total / 60) % 24
+  const m = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
