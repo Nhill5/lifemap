@@ -43,8 +43,26 @@ export function SettingsPage() {
     { key: 'active_minutes', label: 'Active', fmt: v => `${v} min` },
   ]
 
+  // Account / password
+  const { user, setPassword } = useAuth()
+  const [pwd, setPwd] = useState('')
+  const [pwdBusy, setPwdBusy] = useState(false)
+  const [pwdMsg, setPwdMsg] = useState<string | null>(null)
+  const [pwdErr, setPwdErr] = useState<string | null>(null)
+
+  async function savePassword() {
+    if (pwd.length < 6) { setPwdErr('At least 6 characters'); return }
+    setPwdBusy(true); setPwdErr(null); setPwdMsg(null)
+    try {
+      await setPassword(pwd)
+      setPwd('')
+      setPwdMsg('Password saved. You can sign in with email + password next time.')
+    } catch (e) {
+      setPwdErr(e instanceof Error ? e.message : 'Could not set password')
+    } finally { setPwdBusy(false) }
+  }
+
   // Notifications
-  const { user } = useAuth()
   const notif = useNotifications()
   const [morning, setMorning] = useState('07:30')
   const [evening, setEvening] = useState('21:00')
@@ -175,6 +193,28 @@ export function SettingsPage() {
                 {opt.charAt(0).toUpperCase() + opt.slice(1)}
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Account — set a password */}
+        <div style={cardStyle}>
+          <div style={labelStyle}>Account</div>
+          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', marginBottom: 14, lineHeight: 1.5 }}>
+            {user?.email && <>Signed in as <strong>{user.email}</strong>. </>}
+            Set a password to sign in instantly next time — no magic-link email.
+          </p>
+          {pwdErr && <p style={{ fontSize: 13, color: 'var(--warm)', marginBottom: 10 }}>{pwdErr}</p>}
+          {pwdMsg && <p style={{ fontSize: 13, color: 'var(--fitness)', marginBottom: 10 }}>{pwdMsg}</p>}
+          <div style={{ display: 'flex', gap: 8, maxWidth: 360 }}>
+            <input
+              type="password" value={pwd} onChange={e => setPwd(e.target.value)}
+              placeholder="New password (min 6)" minLength={6} autoComplete="new-password"
+              style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '9px 12px', color: 'var(--text)', fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              onKeyDown={e => e.key === 'Enter' && savePassword()}
+            />
+            <Button variant="primary" onClick={savePassword} disabled={pwd.length < 6 || pwdBusy}>
+              {pwdBusy ? 'Saving…' : 'Set password'}
+            </Button>
           </div>
         </div>
 

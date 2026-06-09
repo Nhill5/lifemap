@@ -11,6 +11,10 @@ interface AuthContextValue {
   profileLoading: boolean
   refreshProfile: () => Promise<void>
   signInWithOtp: (email: string) => Promise<void>
+  signInWithPassword: (email: string, password: string) => Promise<void>
+  signUpWithPassword: (email: string, password: string) => Promise<{ needsConfirm: boolean }>
+  setPassword: (password: string) => Promise<void>
+  resetPassword: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -68,6 +72,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }
 
+  const signInWithPassword = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }
+
+  const signUpWithPassword = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/now` },
+    })
+    if (error) throw error
+    // No session means the project requires email confirmation first.
+    return { needsConfirm: !data.session }
+  }
+
+  // For an existing magic-link account to add a password while logged in.
+  const setPassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+  }
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/now`,
+    })
+    if (error) throw error
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
   }
@@ -76,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       session, user: session?.user ?? null, loading,
       profile, profileLoading, refreshProfile,
-      signInWithOtp, signOut,
+      signInWithOtp, signInWithPassword, signUpWithPassword, setPassword, resetPassword, signOut,
     }}>
       {children}
     </AuthContext.Provider>
