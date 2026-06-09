@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { CelebrationProvider } from '@/contexts/CelebrationContext'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
+import { ReloadPrompt } from '@/components/ui/ReloadPrompt'
 
 import { LoginPage }         from '@/pages/LoginPage'
 import { OnboardingPage }    from '@/pages/OnboardingPage'
@@ -85,6 +86,7 @@ export function App() {
       <SettingsProvider>
         <CelebrationProvider>
           <RouterProvider router={router} />
+          <ReloadPrompt />
         </CelebrationProvider>
       </SettingsProvider>
     </AuthProvider>

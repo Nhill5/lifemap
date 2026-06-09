@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' so a new deploy surfaces a visible "reload" banner instead of
+      // silently waiting behind a stale cached service worker (ReloadPrompt
+      // polls for updates so the installed PWA actually notices new builds).
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'icons/*.svg', 'icons/*.png'],
       manifest: {
         name: 'LifeMap',
