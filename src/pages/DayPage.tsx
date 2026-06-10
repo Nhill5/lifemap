@@ -357,8 +357,12 @@ export function DayPage() {
     const isCurrent = isToday && !!block.start_time && !!block.end_time &&
       timeToMinutes(block.start_time) <= nowMinutes && nowMinutes < timeToMinutes(block.end_time)
 
+    // Size the card to its length so longer events read longer on the grid.
+    const durMin = block.start_time && block.end_time ? timeToMinutes(block.end_time) - timeToMinutes(block.start_time) : 0
+    const durStyle: CSSProperties = durMin > 60 ? { minHeight: Math.round((durMin / 60) * 56) } : {}
+
     return (
-      <div key={block.id} className={`tl-block ${block.status} ${isCurrent ? 'now' : ''}`} style={{ '--c': c, ...style } as CSSProperties}>
+      <div key={block.id} className={`tl-block ${block.status} ${isCurrent ? 'now' : ''}`} style={{ '--c': c, ...style, ...durStyle } as CSSProperties}>
         {bucket && <div className="bk">{bucket.name}</div>}
         <div className="bt">{block.title}</div>
         <div className="bs">{formatTimeRange(block.start_time, block.end_time)}</div>

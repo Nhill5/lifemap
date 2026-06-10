@@ -12,7 +12,7 @@ import { useConsistency } from '@/hooks/useConsistency'
 import { useToday } from '@/hooks/useToday'
 import { computePace } from '@/lib/pace'
 import { stateLabel } from '@/lib/accent'
-import { formatTime } from '@/hooks/useClock'
+import { formatTime, timeToMinutes, addMinutes } from '@/hooks/useClock'
 import { WEEKDAYS_MON_FIRST, RECUR_DAILY, RECUR_WEEKDAYS } from '@/lib/week'
 
 function sameSet(a: number[], b: number[]) {
@@ -216,6 +216,9 @@ function SubGoalForm({
   const [unit, setUnit]       = useState(initial?.target_unit ?? '')
   const [days, setDays]       = useState<number[]>(initial?.recurrence_days ?? [])
   const [repeatTime, setRepeatTime] = useState(initial?.recurrence_time?.slice(0, 5) ?? '')
+  const [repeatEnd, setRepeatEnd]   = useState(
+    initial?.recurrence_time ? addMinutes(initial.recurrence_time.slice(0, 5), initial.recurrence_duration_min ?? 60) : '',
+  )
   const [saving, setSaving]   = useState(false)
 
   const fixedDay = days.length > 0
@@ -226,6 +229,9 @@ function SubGoalForm({
     setSaving(true)
     try {
       const recurrenceTime = fixedDay && repeatTime ? repeatTime : null
+      const recurrenceDurationMin = recurrenceTime
+        ? (repeatEnd ? Math.max(15, timeToMinutes(repeatEnd) - timeToMinutes(repeatTime)) : 60)
+        : null
       await onSave({
         title: title.trim(),
         type,
@@ -235,7 +241,7 @@ function SubGoalForm({
         targetUnit: type === 'track_it' ? (unit.trim() || null) : null,
         recurrenceDays: type === 'schedule_it' && fixedDay ? [...days].sort() : null,
         recurrenceTime,
-        recurrenceDurationMin: recurrenceTime ? 60 : null,
+        recurrenceDurationMin,
       })
     } finally { setSaving(false) }
   }
@@ -316,9 +322,21 @@ function SubGoalForm({
           {fixedDay ? (
             <div>
               <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>
-                Time (optional — blank = untimed to-do)
+                Time (optional — leave blank for an untimed to-do)
               </label>
-              <input type="time" value={repeatTime} onChange={e => setRepeatTime(e.target.value)} style={inputStyle} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <input
+                  type="time" aria-label="Start time" value={repeatTime}
+                  onChange={e => { setRepeatTime(e.target.value); if (e.target.value && !repeatEnd) setRepeatEnd(addMinutes(e.target.value, 60)) }}
+                  style={inputStyle}
+                />
+                <input
+                  type="time" aria-label="End time" value={repeatEnd} disabled={!repeatTime}
+                  onChange={e => setRepeatEnd(e.target.value)}
+                  style={{ ...inputStyle, opacity: repeatTime ? 1 : 0.5 }}
+                />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>Start · End</div>
             </div>
           ) : (
             <div>
