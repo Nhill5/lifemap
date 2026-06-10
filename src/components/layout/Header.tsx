@@ -25,6 +25,15 @@ export function Header({ gpa, showGpa = true }: HeaderProps) {
             <span className="l">Life&nbsp;GPA · this week</span>
           </div>
         )}
+        {showGpa && (
+          <button
+            className="icon-btn"
+            title="Log workout"
+            onClick={() => navigate('/workout')}
+          >
+            <Icon name="dumbbell" size={17} />
+          </button>
+        )}
         <button
           className="icon-btn"
           title="Evening mirror"
