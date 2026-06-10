@@ -22,7 +22,6 @@ function sameSet(a: number[], b: number[]) {
 
 const HOUR_START = 6
 const HOUR_END   = 23
-const HOURS = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START)
 
 function formatHour(h: number): string {
   if (h === 12) return '12 PM'
@@ -362,6 +361,27 @@ export function DayPage() {
   const untimedBlocks = blocksHook.blocks.filter(b => !b.start_time)
   const fixedDayCount = proposals.fixedDay.length
 
+  // Bound the timeline to the active part of the day (+1h padding) so it isn't a
+  // wall of empty hours on mobile. Always includes "now" today; min 5-hour window.
+  const visibleHours = (() => {
+    const starts = timedBlocks.map(b => Math.floor(timeToMinutes(b.start_time!) / 60))
+    const ends = timedBlocks.map(b => b.end_time
+      ? Math.ceil(timeToMinutes(b.end_time) / 60)
+      : Math.floor(timeToMinutes(b.start_time!) / 60) + 1)
+    let lo = starts.length ? Math.min(...starts) - 1 : 8
+    let hi = ends.length ? Math.max(...ends) : 18
+    if (isToday) {
+      const nh = Math.floor(nowMinutes / 60)
+      lo = Math.min(lo, nh)
+      hi = Math.max(hi, nh + 1)
+    }
+    lo = Math.max(HOUR_START, lo)
+    hi = Math.min(HOUR_END, Math.max(hi, lo + 4))
+    const out: number[] = []
+    for (let h = lo; h <= hi; h++) out.push(h)
+    return out
+  })()
+
   /* Renders a block as either the inline editor or a card (timed or untimed). */
   function renderBlock(block: RichBlock, style: CSSProperties) {
     if (editingId === block.id) {
@@ -464,7 +484,7 @@ export function DayPage() {
           )}
           <div className="day-wrap reveal" style={{ '--d': '0.06s' } as CSSProperties}>
             <div className="tl">
-              {HOURS.map(hour => {
+              {visibleHours.map(hour => {
                 const hourBlocks = timedBlocks.filter(b => Math.floor(timeToMinutes(b.start_time!) / 60) === hour)
                 const showNowLine = isToday && Math.floor(nowMinutes / 60) === hour
                 return (
