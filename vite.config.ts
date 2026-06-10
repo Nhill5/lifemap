@@ -7,10 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // 'prompt' so a new deploy surfaces a visible "reload" banner instead of
-      // silently waiting behind a stale cached service worker (ReloadPrompt
-      // polls for updates so the installed PWA actually notices new builds).
-      registerType: 'prompt',
+      // 'autoUpdate' + skipWaiting/clientsClaim below: a new deploy takes over
+      // immediately and reloads — no stale cached build can get stuck. The
+      // ReloadPrompt also polls for updates so open tabs refresh quickly.
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/*.svg', 'icons/*.png'],
       manifest: {
         name: 'LifeMap',
@@ -40,6 +40,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // Web Push handlers (push + notificationclick) folded into the SW
         importScripts: ['push-sw.js'],
+        // Never serve a stale app: new SW activates + claims clients at once,
+        // old precaches are purged.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

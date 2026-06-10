@@ -8,7 +8,7 @@ import { useBlocks, type RichBlock, type EditBlockParams } from '@/hooks/useBloc
 import { useDayPlan } from '@/hooks/useDayPlan'
 import { useProposals } from '@/hooks/useProposals'
 import { useToday, isoOffset, formatDateLabel } from '@/hooks/useToday'
-import { useClock, timeToMinutes, formatTimeRange } from '@/hooks/useClock'
+import { useClock, timeToMinutes, formatTimeRange, addMinutes } from '@/hooks/useClock'
 import { accent } from '@/lib/accent'
 import { WEEKDAYS_MON_FIRST, RECUR_DAILY, RECUR_WEEKDAYS } from '@/lib/week'
 import { materializeRecurrence } from '@/lib/recurrence'
@@ -104,9 +104,8 @@ interface AddBlockFormProps {
 function AddBlockForm({ buckets, onSubmit, onCancel }: AddBlockFormProps) {
   const [title, setTitle]       = useState('')
   const [bucketId, setBucketId] = useState<string>('')
-  const [timed, setTimed]       = useState(false)        // default: untimed to-do, never auto-stamped
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime]     = useState('10:00')
+  const [startTime, setStartTime] = useState('')   // blank by default — never auto-stamped
+  const [endTime, setEndTime]     = useState('')
   const [isMajor, setIsMajor]     = useState(false)
   const [days, setDays]           = useState<number[]>([])  // repeat
   const [saving, setSaving]       = useState(false)
@@ -117,14 +116,17 @@ function AddBlockForm({ buckets, onSubmit, onCancel }: AddBlockFormProps) {
   const repeating = days.length > 0
   const needsBucket = repeating && !bucketId
   const toggleDay = (code: number) => setDays(d => d.includes(code) ? d.filter(x => x !== code) : [...d, code])
+  // Auto-fill end to +1h when a start is entered (still editable)
+  const onStart = (v: string) => { setStartTime(v); if (v && !endTime) setEndTime(addMinutes(v, 60)) }
 
   async function handleAdd() {
     if (!title.trim()) return
-    if (timed && (!startTime || !endTime)) return
     if (needsBucket) return
+    const s = startTime.trim()
+    const e = s ? (endTime.trim() || addMinutes(s, 60)) : ''
     setSaving(true)
     try {
-      await onSubmit({ title: title.trim(), bucketId: bucketId || null, timed, start: startTime, end: endTime, isMajor, days: [...days].sort() })
+      await onSubmit({ title: title.trim(), bucketId: bucketId || null, timed: !!s, start: s, end: e, isMajor, days: [...days].sort() })
     } finally { setSaving(false) }
   }
 
@@ -139,8 +141,13 @@ function AddBlockForm({ buckets, onSubmit, onCancel }: AddBlockFormProps) {
         {buckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
 
-      <ToggleRow value={timed} onChange={setTimed} label="Set a time" sub={timed ? (repeating ? 'time it recurs at' : 'a timed block') : 'untimed to-do'} />
-      {timed && <TimeFields start={startTime} end={endTime} setStart={setStartTime} setEnd={setEndTime} />}
+      {/* Time — always available, optional (blank = untimed to-do) */}
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>
+          Time (optional — leave blank for an untimed to-do)
+        </label>
+        <TimeFields start={startTime} end={endTime} setStart={onStart} setEnd={setEndTime} />
+      </div>
 
       {/* Repeat — turns this into a recurring schedule-it sub-goal */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
