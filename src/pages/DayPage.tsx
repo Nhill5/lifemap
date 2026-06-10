@@ -375,16 +375,16 @@ export function DayPage() {
         <div className="bs">{formatTimeRange(block.start_time, block.end_time)}</div>
 
         {block.status === 'planned' && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
             <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'done') }} style={blockActionBtn}>Done ✓</button>
             <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'missed') }} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Missed</button>
           </div>
         )}
         {block.status === 'done' && (
-          <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'planned') }} style={{ ...blockActionBtn, marginTop: 8 }}>Undo</button>
+          <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'planned') }} style={{ ...blockActionBtn, marginTop: 6 }}>Undo</button>
         )}
 
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 5, marginTop: 4, flexWrap: 'wrap' }}>
           <button onClick={e => { e.stopPropagation(); setEditingId(block.id); setDeletingId(null) }} style={blockActionBtn}>Edit</button>
           {deletingId === block.id ? (
             <>
@@ -421,7 +421,7 @@ export function DayPage() {
             <div className="reveal" style={{ marginBottom: 18, '--d': '0.04s' } as CSSProperties}>
               <Eyebrow style={{ marginBottom: 10, display: 'block' }}>Anytime today</Eyebrow>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {untimedBlocks.map(b => renderBlock(b, {}))}
+                {untimedBlocks.map(b => renderBlock(b, { position: 'relative', left: 0, right: 0, top: 0 }))}
               </div>
             </div>
           )}
@@ -433,7 +433,7 @@ export function DayPage() {
                 const hourBlocks = timedBlocks.filter(b => Math.floor(timeToMinutes(b.start_time!) / 60) === hour)
                 const showNowLine = isToday && Math.floor(nowMinutes / 60) === hour
                 return (
-                  <div key={hour} className="tl-row" style={{ minHeight: 56 + hourBlocks.length * 68 }}>
+                  <div key={hour} className="tl-row" style={{ minHeight: 56 + hourBlocks.length * 56 }}>
                     <div className="tl-hour">{formatHour(hour)}</div>
                     <div className="tl-track">
                       {showNowLine && (
@@ -511,6 +511,6 @@ export function DayPage() {
 
 const blockActionBtn: CSSProperties = {
   background: 'none', border: '1px solid var(--line)', borderRadius: 100,
-  padding: '3px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)',
+  padding: '2px 9px', fontSize: 10.5, fontWeight: 600, color: 'var(--text-dim)',
   cursor: 'pointer', fontFamily: 'inherit',
 }

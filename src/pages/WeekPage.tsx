@@ -102,7 +102,9 @@ function ConsistencyRing({ score, color, label }: { score: BucketScore; color: s
 /*  WeekPage                                                            */
 /* ------------------------------------------------------------------ */
 
-type TaskRow = { id: string; bucket_id: string | null; rollover_count: number; is_major: boolean; buckets: { id: string; name: string; color: string } | null }
+type BucketRef = { id: string; name: string; color: string } | null
+type TaskRow = { id: string; bucket_id: string | null; rollover_count: number; is_major: boolean; buckets: BucketRef }
+type SubGoalRef = { bucket_id: string | null; buckets: BucketRef } | null
 
 export function WeekPage() {
   const navigate = useNavigate()
@@ -127,7 +129,7 @@ export function WeekPage() {
     Promise.all([
       supabase
         .from('blocks')
-        .select('*, tasks(id, bucket_id, rollover_count, is_major, buckets(id, name, color))')
+        .select('*, tasks(id, bucket_id, rollover_count, is_major, buckets(id, name, color)), sub_goals(bucket_id, buckets(id, name, color))')
         .eq('user_id', user.id)
         .gte('date', weekMonday)
         .lte('date', weekEnd)
@@ -140,13 +142,13 @@ export function WeekPage() {
         .gte('date', weekMonday)
         .lte('date', weekEnd),
     ]).then(([blocksRes, plansRes]) => {
-      const raw = (blocksRes.data ?? []) as (Block & { tasks: TaskRow | null })[]
+      const raw = (blocksRes.data ?? []) as unknown as (Block & { tasks: TaskRow | null; sub_goals: SubGoalRef })[]
       const richBlocks: RichBlock[] = raw.map(b => {
-        const { tasks, ...blockFields } = b
-        const bucket = tasks?.buckets ?? null
+        const { tasks, sub_goals, ...blockFields } = b
+        const bucket = tasks?.buckets ?? sub_goals?.buckets ?? null
         return {
           ...blockFields,
-          bucket_id: tasks?.bucket_id ?? null,
+          bucket_id: tasks?.bucket_id ?? sub_goals?.bucket_id ?? null,
           bucket_color: (bucket?.color ?? null) as AccentSlot | null,
           bucket_name: bucket?.name ?? null,
           rollover_count: tasks?.rollover_count ?? 0,

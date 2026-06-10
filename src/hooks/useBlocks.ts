@@ -29,20 +29,24 @@ export interface EditBlockParams {
   isMajor: boolean
 }
 
+type BucketRef = { id: string; name: string; color: string } | null
 type TaskRow = {
   id: string
   bucket_id: string | null
   rollover_count: number
   is_major: boolean
-  buckets: { id: string; name: string; color: string } | null
+  buckets: BucketRef
 }
+type SubGoalRef = { bucket_id: string | null; buckets: BucketRef } | null
 
-function toRich(b: Block & { tasks: TaskRow | null }): RichBlock {
-  const { tasks, ...blockFields } = b
-  const bucket = tasks?.buckets ?? null
+function toRich(b: Block & { tasks: TaskRow | null; sub_goals: SubGoalRef }): RichBlock {
+  const { tasks, sub_goals, ...blockFields } = b
+  // Bucket comes from the task (for task/external blocks) OR the sub-goal
+  // (for recurring blocks) — so every block carries its bucket color.
+  const bucket = tasks?.buckets ?? sub_goals?.buckets ?? null
   return {
     ...blockFields,
-    bucket_id: tasks?.bucket_id ?? null,
+    bucket_id: tasks?.bucket_id ?? sub_goals?.bucket_id ?? null,
     bucket_color: (bucket?.color ?? null) as AccentSlot | null,
     bucket_name: bucket?.name ?? null,
     rollover_count: tasks?.rollover_count ?? 0,
@@ -62,13 +66,13 @@ export function useBlocks(date: string) {
     setLoading(true)
     supabase
       .from('blocks')
-      .select('*, tasks(id, bucket_id, rollover_count, is_major, buckets(id, name, color))')
+      .select('*, tasks(id, bucket_id, rollover_count, is_major, buckets(id, name, color)), sub_goals(bucket_id, buckets(id, name, color))')
       .eq('user_id', user.id)
       .eq('date', date)
       .in('status', ['planned', 'done', 'missed', 'moved'])
       .order('start_time')
       .then(({ data }) => {
-        setBlocks(((data ?? []) as (Block & { tasks: TaskRow | null })[]).map(toRich))
+        setBlocks(((data ?? []) as unknown as (Block & { tasks: TaskRow | null; sub_goals: SubGoalRef })[]).map(toRich))
         setLoading(false)
       })
   }, [user, date, tick])
