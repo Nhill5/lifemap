@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToday } from '@/hooks/useToday'
 import { weekRange } from '@/lib/week'
+import { materializeRecurrence, clearFutureOccurrences } from '@/lib/recurrence'
 import type { Bucket, ChiefGoal, SubGoal, SubGoalType, TrackRating } from '@/types'
 
 export interface ChiefGoalParams {
@@ -143,7 +144,7 @@ export function useBucketDetail(bucketId: string | undefined): BucketDetail {
   async function addSubGoal(p: SubGoalParams) {
     if (!user || !bucketId) return
     const schedule = p.type === 'schedule_it'
-    await supabase.from('sub_goals').insert({
+    const { data: inserted } = await supabase.from('sub_goals').insert({
       user_id: user.id,
       bucket_id: bucketId,
       chief_goal_id: chiefGoal?.id ?? null,
@@ -157,11 +158,20 @@ export function useBucketDetail(bucketId: string | undefined): BucketDetail {
       recurrence_duration_min: schedule ? p.recurrenceDurationMin : null,
       data_source: 'manual',
       status: 'active',
-    })
+    }).select('id').single()
+
+    // Fill the calendar across the horizon so it shows on every chosen day.
+    if (inserted && schedule && p.recurrenceDays && p.recurrenceDays.length > 0) {
+      await materializeRecurrence({
+        userId: user.id, subGoalId: inserted.id, title: p.title,
+        days: p.recurrenceDays, time: p.recurrenceTime, durationMin: p.recurrenceDurationMin, fromDate: today,
+      })
+    }
     refetch()
   }
 
   async function editSubGoal(id: string, p: SubGoalParams) {
+    if (!user) return
     const schedule = p.type === 'schedule_it'
     await supabase.from('sub_goals').update({
       title: p.title,
@@ -173,12 +183,23 @@ export function useBucketDetail(bucketId: string | undefined): BucketDetail {
       recurrence_time: schedule ? p.recurrenceTime : null,
       recurrence_duration_min: schedule ? p.recurrenceDurationMin : null,
     }).eq('id', id)
+
+    // Re-sync future occurrences to the edited pattern (done/missed kept).
+    await clearFutureOccurrences(id, today)
+    if (schedule && p.recurrenceDays && p.recurrenceDays.length > 0) {
+      await materializeRecurrence({
+        userId: user.id, subGoalId: id, title: p.title,
+        days: p.recurrenceDays, time: p.recurrenceTime, durationMin: p.recurrenceDurationMin, fromDate: today,
+      })
+    }
     refetch()
   }
 
   async function deleteSubGoal(id: string) {
-    // Soft-delete: keep the row for history, drop it from active views
+    // Soft-delete: keep the row for history, drop it from active views,
+    // and clear its future (un-done) occurrences from the calendar.
     await supabase.from('sub_goals').update({ status: 'abandoned' }).eq('id', id)
+    await clearFutureOccurrences(id, today)
     refetch()
   }
 

@@ -10,7 +10,8 @@ import { useProposals } from '@/hooks/useProposals'
 import { useToday, isoOffset, formatDateLabel } from '@/hooks/useToday'
 import { useClock, timeToMinutes, formatTimeRange } from '@/hooks/useClock'
 import { accent } from '@/lib/accent'
-import { weekdayOf, WEEKDAYS_MON_FIRST, RECUR_DAILY, RECUR_WEEKDAYS } from '@/lib/week'
+import { WEEKDAYS_MON_FIRST, RECUR_DAILY, RECUR_WEEKDAYS } from '@/lib/week'
+import { materializeRecurrence } from '@/lib/recurrence'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Bucket } from '@/types'
@@ -299,18 +300,10 @@ export function DayPage() {
 
     // Place the task on EVERY chosen weekday across the horizon, right now —
     // set it once, it's on the calendar for all those days (no per-day commit).
-    const HORIZON_DAYS = 56 // ~8 weeks
-    const rows = []
-    for (let i = 0; i <= HORIZON_DAYS; i++) {
-      const d = isoOffset(dateParam, i)
-      if (p.days.includes(weekdayOf(d))) {
-        rows.push({
-          user_id: user.id, sub_goal_id: sg.id, source: 'sub_goal', title: p.title,
-          date: d, start_time: p.timed ? p.start : null, end_time: p.timed ? p.end : null, status: 'planned' as const,
-        })
-      }
-    }
-    if (rows.length) await supabase.from('blocks').insert(rows)
+    await materializeRecurrence({
+      userId: user.id, subGoalId: sg.id, title: p.title,
+      days: p.days, time: p.timed ? p.start : null, durationMin, fromDate: dateParam,
+    })
   }
 
   async function handleAdd(p: AddSubmit) {
