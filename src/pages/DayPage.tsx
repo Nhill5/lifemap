@@ -295,13 +295,22 @@ export function DayPage() {
       data_source: 'manual',
       status: 'active',
     }).select('id').single()
+    if (!sg) return
 
-    if (sg && p.days.includes(weekdayOf(dateParam))) {
-      await supabase.from('blocks').insert({
-        user_id: user.id, sub_goal_id: sg.id, source: 'sub_goal', title: p.title,
-        date: dateParam, start_time: p.timed ? p.start : null, end_time: p.timed ? p.end : null, status: 'planned',
-      })
+    // Place the task on EVERY chosen weekday across the horizon, right now —
+    // set it once, it's on the calendar for all those days (no per-day commit).
+    const HORIZON_DAYS = 56 // ~8 weeks
+    const rows = []
+    for (let i = 0; i <= HORIZON_DAYS; i++) {
+      const d = isoOffset(dateParam, i)
+      if (p.days.includes(weekdayOf(d))) {
+        rows.push({
+          user_id: user.id, sub_goal_id: sg.id, source: 'sub_goal', title: p.title,
+          date: d, start_time: p.timed ? p.start : null, end_time: p.timed ? p.end : null, status: 'planned' as const,
+        })
+      }
     }
+    if (rows.length) await supabase.from('blocks').insert(rows)
   }
 
   async function handleAdd(p: AddSubmit) {
