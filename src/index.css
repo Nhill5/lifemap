@@ -433,6 +433,19 @@ nav.seg button.mirror.on { background: var(--fitness); color: #06281c; }
   text-transform: uppercase; letter-spacing: 0.08em;
 }
 
+/* Drag-to-reschedule is a hover/fine-pointer (desktop) interaction; native
+   HTML5 drag doesn't fire on touch. Hide the hint there and rely on tap-to-edit. */
+.drag-hint { display: none; }
+@media (hover: hover) and (pointer: fine) { .drag-hint { display: block; } }
+
+/* Block action buttons (Done / Missed / Edit / Delete) */
+.blk-act {
+  background: none; border: 1px solid var(--line); border-radius: 100px;
+  padding: 2px 9px; font-size: 10.5px; font-weight: 600; color: var(--text-dim);
+  cursor: pointer; font-family: inherit; transition: border-color 0.15s, color 0.15s;
+}
+.blk-act:hover { border-color: var(--line-strong); color: var(--text); }
+
 /* ============ WEEK GRID ============ */
 .week-grid-wrap { overflow-x: auto; }
 .week-grid { display: grid; grid-template-columns: 52px repeat(7, minmax(120px, 1fr)); min-width: 760px; }
@@ -772,6 +785,19 @@ nav.seg button.mirror.on { background: var(--fitness); color: #06281c; }
   .now-head .date { font-size: 22px; }
   .rail { gap: 10px; }
   .meter { min-width: calc(50% - 5px); padding: 12px 13px; gap: 11px; }
+  .meter .ring { width: 30px; height: 30px; }
+  .meter .info .v { font-size: 13.5px; }
+  /* Day timeline — narrower hour gutter, tighter blocks, edge-to-edge cards */
+  .tl-row { grid-template-columns: 42px 1fr; }
+  .tl-hour { font-size: 10.5px; }
+  .tl-block { left: 3px; right: 3px; padding: 7px 11px; }
+  .tl-block .bt { font-size: 13px; }
+  .tl-block .bs { font-size: 11px; }
+  .now-line::before { left: 36px; }
+  .now-line .now-lbl { font-size: 9.5px; right: 4px; }
+  /* Actions are roomier for touch (no hover to rely on) */
+  .tl-block.expanded .tl-actions { gap: 6px; }
+  .blk-act { padding: 6px 13px; font-size: 12px; }
   .headline .big { font-size: 34px; }
   .headline .sub { font-size: 18px; }
   .panorama-head h2 { font-size: 25px; }

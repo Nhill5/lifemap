@@ -406,23 +406,23 @@ export function DayPage() {
         <div className="tl-actions" onClick={e => e.stopPropagation()}>
           {block.status === 'planned' && (
             <div style={{ display: 'flex', gap: 5 }}>
-              <button onClick={() => blocksHook.setStatus(block.id, 'done')} style={blockActionBtn}>Done ✓</button>
-              <button onClick={() => blocksHook.setStatus(block.id, 'missed')} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Missed</button>
+              <button onClick={() => blocksHook.setStatus(block.id, 'done')} className="blk-act">Done ✓</button>
+              <button onClick={() => blocksHook.setStatus(block.id, 'missed')} className="blk-act" style={{ color: 'var(--text-faint)' }}>Missed</button>
             </div>
           )}
           {block.status === 'done' && (
-            <button onClick={() => blocksHook.setStatus(block.id, 'planned')} style={blockActionBtn}>Undo</button>
+            <button onClick={() => blocksHook.setStatus(block.id, 'planned')} className="blk-act">Undo</button>
           )}
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-            <button onClick={() => { setEditingId(block.id); setDeletingId(null) }} style={blockActionBtn}>Edit</button>
+            <button onClick={() => { setEditingId(block.id); setDeletingId(null) }} className="blk-act">Edit</button>
             {deletingId === block.id ? (
               <>
                 <span style={{ fontSize: 11, color: 'var(--text-faint)', alignSelf: 'center' }}>Drop?</span>
-                <button onClick={async () => { setDeletingId(null); await blocksHook.dropBlock(block) }} style={{ ...blockActionBtn, color: 'var(--warm)' }}>Yes</button>
-                <button onClick={() => setDeletingId(null)} style={blockActionBtn}>No</button>
+                <button onClick={async () => { setDeletingId(null); await blocksHook.dropBlock(block) }} className="blk-act" style={{ color: 'var(--warm)' }}>Yes</button>
+                <button onClick={() => setDeletingId(null)} className="blk-act">No</button>
               </>
             ) : (
-              <button onClick={() => { setDeletingId(block.id); setEditingId(null) }} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Delete</button>
+              <button onClick={() => { setDeletingId(block.id); setEditingId(null) }} className="blk-act" style={{ color: 'var(--text-faint)' }}>Delete</button>
             )}
           </div>
         </div>
@@ -458,7 +458,7 @@ export function DayPage() {
 
           {/* Timeline — timed blocks */}
           {timedBlocks.length > 0 && (
-            <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 6, textAlign: 'right' }}>
+            <div className="drag-hint" style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 6, textAlign: 'right' }}>
               Drag a block to reschedule
             </div>
           )}
@@ -506,7 +506,7 @@ export function DayPage() {
 
           {/* Commit strip — also brings in pre-included recurrences */}
           {!dayPlan.isCommitted && (blocksHook.blocks.length > 0 || fixedDayCount > 0) && (
-            <div className="reveal" style={{ '--d': '0.15s', marginTop: 28, padding: '18px 22px', background: 'linear-gradient(150deg, color-mix(in srgb, var(--fitness) 10%, var(--surface)), var(--surface))', border: '1px solid color-mix(in srgb, var(--fitness) 22%, transparent)', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 } as CSSProperties}>
+            <div className="reveal" style={{ '--d': '0.15s', marginTop: 28, padding: '18px 22px', background: 'linear-gradient(150deg, color-mix(in srgb, var(--fitness) 10%, var(--surface)), var(--surface))', border: '1px solid color-mix(in srgb, var(--fitness) 22%, transparent)', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' } as CSSProperties}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 15 }}>
                   {blocksHook.blocks.length} item{blocksHook.blocks.length === 1 ? '' : 's'} planned
@@ -549,8 +549,3 @@ export function DayPage() {
   )
 }
 
-const blockActionBtn: CSSProperties = {
-  background: 'none', border: '1px solid var(--line)', borderRadius: 100,
-  padding: '2px 9px', fontSize: 10.5, fontWeight: 600, color: 'var(--text-dim)',
-  cursor: 'pointer', fontFamily: 'inherit',
-}
