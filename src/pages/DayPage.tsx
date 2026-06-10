@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type CSSProperties, type DragEvent } from 'react'
+import { useState, useRef, useEffect, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
@@ -278,20 +278,46 @@ export function DayPage() {
   const [committing, setCommitting]   = useState(false)
   const [expandedId, setExpandedId]   = useState<string | null>(null)  // tap a card to reveal actions
   const [draggingId, setDraggingId]   = useState<string | null>(null)  // block being dragged
-  const [dropHour, setDropHour]       = useState<number | null>(null)  // hour row under the cursor
+  const [dropHour, setDropHour]       = useState<number | null>(null)  // hour row under the pointer
+  const dragRef = useRef<{ block: RichBlock; pointerId: number } | null>(null)
 
-  // Drop a dragged block onto an hour row → reschedule it there.
-  // 56px maps to 60min (same scale as the NOW line); snaps to 15-min steps.
-  function handleDrop(e: DragEvent, hour: number) {
+  // Which hour row (and minute) sits under a screen point. 56px = 60min, matching
+  // the NOW line; snaps to 15-min steps. Hit-tests the real element so variable
+  // row heights don't matter.
+  function locateDrop(x: number, y: number): { hour: number; min: number } | null {
+    const el = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest('[data-hour]') as HTMLElement | null
+    if (!el) return null
+    const hour = Number(el.getAttribute('data-hour'))
+    const top = el.getBoundingClientRect().top
+    const min = Math.max(0, Math.min(45, Math.round(((y - top) / 56) * 4) * 15))
+    return { hour, min }
+  }
+
+  // Pointer-based drag from the grip handle — the only path that works on touch
+  // (native HTML5 drag never fires on mobile). Pointer capture keeps move/up on
+  // the grip even as the finger leaves it.
+  function gripDown(e: ReactPointerEvent, block: RichBlock) {
+    if (e.button && e.button !== 0) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = { block, pointerId: e.pointerId }
+    setDraggingId(block.id)
+  }
+  function gripMove(e: ReactPointerEvent) {
+    if (!dragRef.current) return
     e.preventDefault()
-    setDropHour(null)
+    const loc = locateDrop(e.clientX, e.clientY)
+    setDropHour(loc ? loc.hour : null)
+  }
+  function gripUp(e: ReactPointerEvent) {
+    const d = dragRef.current
+    if (d) {
+      const loc = locateDrop(e.clientX, e.clientY)
+      if (loc) blocksHook.moveBlock(d.block, loc.hour * 60 + loc.min)
+    }
+    dragRef.current = null
     setDraggingId(null)
-    const id = e.dataTransfer.getData('text/plain')
-    const block = blocksHook.blocks.find(b => b.id === id)
-    if (!block) return
-    const offsetY = e.clientY - e.currentTarget.getBoundingClientRect().top
-    const min = Math.max(0, Math.min(45, Math.round((offsetY / 56) * 4) * 15))
-    blocksHook.moveBlock(block, hour * 60 + min)
+    setDropHour(null)
   }
 
   function navigate_date(offset: number) {
@@ -401,23 +427,25 @@ export function DayPage() {
     const isCurrent = isToday && !!block.start_time && !!block.end_time &&
       timeToMinutes(block.start_time) <= nowMinutes && nowMinutes < timeToMinutes(block.end_time)
 
-    // Size the card to its length so longer events read longer on the grid.
-    const durMin = block.start_time && block.end_time ? timeToMinutes(block.end_time) - timeToMinutes(block.start_time) : 0
-    const durStyle: CSSProperties = durMin > 90 ? { minHeight: Math.round((durMin / 60) * 40) } : {}
-
     const expanded = expandedId === block.id
 
     return (
       <div
         key={block.id}
         className={`tl-block ${block.status} ${isCurrent ? 'now' : ''} ${expanded ? 'expanded' : ''} ${draggingId === block.id ? 'dragging' : ''}`}
-        style={{ '--c': c, ...style, ...durStyle } as CSSProperties}
-        title="Drag to reschedule"
-        draggable
-        onDragStart={e => { e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; setDraggingId(block.id) }}
-        onDragEnd={() => { setDraggingId(null); setDropHour(null) }}
+        style={{ '--c': c, ...style } as CSSProperties}
         onClick={() => setExpandedId(id => (id === block.id ? null : block.id))}
       >
+        <button
+          className="tl-grip"
+          aria-label="Drag to reschedule"
+          title="Drag to reschedule"
+          onPointerDown={e => gripDown(e, block)}
+          onPointerMove={gripMove}
+          onPointerUp={gripUp}
+          onPointerCancel={gripUp}
+          onClick={e => e.stopPropagation()}
+        >⠿</button>
         {bucket && <div className="bk">{bucket.name}</div>}
         <div className="bt">{block.title}</div>
         <div className="bs">{formatTimeRange(block.start_time, block.end_time)}</div>
@@ -478,8 +506,8 @@ export function DayPage() {
 
           {/* Timeline — timed blocks */}
           {timedBlocks.length > 0 && (
-            <div className="drag-hint" style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 6, textAlign: 'right' }}>
-              Drag a block to reschedule
+            <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 6, textAlign: 'right' }}>
+              Drag the <span style={{ fontSize: 13 }}>⠿</span> handle to reschedule
             </div>
           )}
           <div className="day-wrap reveal" style={{ '--d': '0.06s' } as CSSProperties}>
@@ -488,13 +516,11 @@ export function DayPage() {
                 const hourBlocks = timedBlocks.filter(b => Math.floor(timeToMinutes(b.start_time!) / 60) === hour)
                 const showNowLine = isToday && Math.floor(nowMinutes / 60) === hour
                 return (
-                  <div key={hour} className="tl-row" style={{ minHeight: 56 + hourBlocks.length * 44 }}>
+                  <div key={hour} className="tl-row" style={{ minHeight: 56 }}>
                     <div className="tl-hour">{formatHour(hour)}</div>
                     <div
                       className={`tl-track ${dropHour === hour ? 'drop-target' : ''}`}
-                      onDragOver={draggingId ? (e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropHour(hour) }) : undefined}
-                      onDragLeave={() => setDropHour(h => (h === hour ? null : h))}
-                      onDrop={e => handleDrop(e, hour)}
+                      data-hour={hour}
                     >
                       {showNowLine && (
                         <div className="now-line" style={{ top: `${((nowMinutes % 60) / 60) * 56}px`, position: 'absolute', left: 0, right: 0 }}>
