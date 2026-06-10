@@ -48,6 +48,14 @@ export function formatTimeRange(start: string | null, end: string | null): strin
   return end ? `${formatTime(start)} – ${formatTime(end)}` : formatTime(start)
 }
 
+/** Minutes-since-midnight → "HH:MM" (clamped to a single day). */
+export function minutesToTime(mins: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(mins)))
+  const h = Math.floor(clamped / 60)
+  const m = clamped % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 export function addMinutes(hhmm: string, mins: number): string {
   const total = timeToMinutes(hhmm) + mins
   const h = Math.floor(total / 60) % 24

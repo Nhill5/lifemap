@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type CSSProperties } from 'react'
+import { useState, useRef, useEffect, type CSSProperties, type DragEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
@@ -277,6 +277,23 @@ export function DayPage() {
   const [editingId, setEditingId]     = useState<string | null>(null)
   const [deletingId, setDeletingId]   = useState<string | null>(null)
   const [committing, setCommitting]   = useState(false)
+  const [expandedId, setExpandedId]   = useState<string | null>(null)  // tap a card to reveal actions
+  const [draggingId, setDraggingId]   = useState<string | null>(null)  // block being dragged
+  const [dropHour, setDropHour]       = useState<number | null>(null)  // hour row under the cursor
+
+  // Drop a dragged block onto an hour row → reschedule it there.
+  // 56px maps to 60min (same scale as the NOW line); snaps to 15-min steps.
+  function handleDrop(e: DragEvent, hour: number) {
+    e.preventDefault()
+    setDropHour(null)
+    setDraggingId(null)
+    const id = e.dataTransfer.getData('text/plain')
+    const block = blocksHook.blocks.find(b => b.id === id)
+    if (!block) return
+    const offsetY = e.clientY - e.currentTarget.getBoundingClientRect().top
+    const min = Math.max(0, Math.min(45, Math.round((offsetY / 56) * 4) * 15))
+    blocksHook.moveBlock(block, hour * 60 + min)
+  }
 
   function navigate_date(offset: number) {
     const newDate = isoOffset(dateParam, offset)
@@ -366,35 +383,48 @@ export function DayPage() {
 
     // Size the card to its length so longer events read longer on the grid.
     const durMin = block.start_time && block.end_time ? timeToMinutes(block.end_time) - timeToMinutes(block.start_time) : 0
-    const durStyle: CSSProperties = durMin > 60 ? { minHeight: Math.round((durMin / 60) * 56) } : {}
+    const durStyle: CSSProperties = durMin > 90 ? { minHeight: Math.round((durMin / 60) * 40) } : {}
+
+    const expanded = expandedId === block.id
 
     return (
-      <div key={block.id} className={`tl-block ${block.status} ${isCurrent ? 'now' : ''}`} style={{ '--c': c, ...style, ...durStyle } as CSSProperties}>
+      <div
+        key={block.id}
+        className={`tl-block ${block.status} ${isCurrent ? 'now' : ''} ${expanded ? 'expanded' : ''} ${draggingId === block.id ? 'dragging' : ''}`}
+        style={{ '--c': c, ...style, ...durStyle } as CSSProperties}
+        title="Drag to reschedule"
+        draggable
+        onDragStart={e => { e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; setDraggingId(block.id) }}
+        onDragEnd={() => { setDraggingId(null); setDropHour(null) }}
+        onClick={() => setExpandedId(id => (id === block.id ? null : block.id))}
+      >
         {bucket && <div className="bk">{bucket.name}</div>}
         <div className="bt">{block.title}</div>
         <div className="bs">{formatTimeRange(block.start_time, block.end_time)}</div>
 
-        {block.status === 'planned' && (
-          <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
-            <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'done') }} style={blockActionBtn}>Done ✓</button>
-            <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'missed') }} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Missed</button>
-          </div>
-        )}
-        {block.status === 'done' && (
-          <button onClick={e => { e.stopPropagation(); blocksHook.setStatus(block.id, 'planned') }} style={{ ...blockActionBtn, marginTop: 6 }}>Undo</button>
-        )}
-
-        <div style={{ display: 'flex', gap: 5, marginTop: 4, flexWrap: 'wrap' }}>
-          <button onClick={e => { e.stopPropagation(); setEditingId(block.id); setDeletingId(null) }} style={blockActionBtn}>Edit</button>
-          {deletingId === block.id ? (
-            <>
-              <span style={{ fontSize: 11, color: 'var(--text-faint)', alignSelf: 'center' }}>Drop?</span>
-              <button onClick={async e => { e.stopPropagation(); setDeletingId(null); await blocksHook.dropBlock(block) }} style={{ ...blockActionBtn, color: 'var(--warm)' }}>Yes</button>
-              <button onClick={e => { e.stopPropagation(); setDeletingId(null) }} style={blockActionBtn}>No</button>
-            </>
-          ) : (
-            <button onClick={e => { e.stopPropagation(); setDeletingId(block.id); setEditingId(null) }} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Delete</button>
+        {/* Actions stay hidden until hover (desktop) or tap-to-expand (touch) */}
+        <div className="tl-actions" onClick={e => e.stopPropagation()}>
+          {block.status === 'planned' && (
+            <div style={{ display: 'flex', gap: 5 }}>
+              <button onClick={() => blocksHook.setStatus(block.id, 'done')} style={blockActionBtn}>Done ✓</button>
+              <button onClick={() => blocksHook.setStatus(block.id, 'missed')} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Missed</button>
+            </div>
           )}
+          {block.status === 'done' && (
+            <button onClick={() => blocksHook.setStatus(block.id, 'planned')} style={blockActionBtn}>Undo</button>
+          )}
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            <button onClick={() => { setEditingId(block.id); setDeletingId(null) }} style={blockActionBtn}>Edit</button>
+            {deletingId === block.id ? (
+              <>
+                <span style={{ fontSize: 11, color: 'var(--text-faint)', alignSelf: 'center' }}>Drop?</span>
+                <button onClick={async () => { setDeletingId(null); await blocksHook.dropBlock(block) }} style={{ ...blockActionBtn, color: 'var(--warm)' }}>Yes</button>
+                <button onClick={() => setDeletingId(null)} style={blockActionBtn}>No</button>
+              </>
+            ) : (
+              <button onClick={() => { setDeletingId(block.id); setEditingId(null) }} style={{ ...blockActionBtn, color: 'var(--text-faint)' }}>Delete</button>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -427,15 +457,25 @@ export function DayPage() {
           )}
 
           {/* Timeline — timed blocks */}
+          {timedBlocks.length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 6, textAlign: 'right' }}>
+              Drag a block to reschedule
+            </div>
+          )}
           <div className="day-wrap reveal" style={{ '--d': '0.06s' } as CSSProperties}>
             <div className="tl">
               {HOURS.map(hour => {
                 const hourBlocks = timedBlocks.filter(b => Math.floor(timeToMinutes(b.start_time!) / 60) === hour)
                 const showNowLine = isToday && Math.floor(nowMinutes / 60) === hour
                 return (
-                  <div key={hour} className="tl-row" style={{ minHeight: 56 + hourBlocks.length * 56 }}>
+                  <div key={hour} className="tl-row" style={{ minHeight: 56 + hourBlocks.length * 44 }}>
                     <div className="tl-hour">{formatHour(hour)}</div>
-                    <div className="tl-track">
+                    <div
+                      className={`tl-track ${dropHour === hour ? 'drop-target' : ''}`}
+                      onDragOver={draggingId ? (e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropHour(hour) }) : undefined}
+                      onDragLeave={() => setDropHour(h => (h === hour ? null : h))}
+                      onDrop={e => handleDrop(e, hour)}
+                    >
                       {showNowLine && (
                         <div className="now-line" style={{ top: `${((nowMinutes % 60) / 60) * 56}px`, position: 'absolute', left: 0, right: 0 }}>
                           <div className="now-lbl">NOW</div>

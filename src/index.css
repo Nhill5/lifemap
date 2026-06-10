@@ -395,16 +395,26 @@ nav.seg button.mirror.on { background: var(--fitness); color: #06281c; }
 .tl-hour { font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; padding-top: 2px; }
 .tl-track { position: relative; border-top: 1px solid var(--line); }
 .tl-block {
-  position: absolute; left: 8px; right: 8px; border-radius: 9px; padding: 6px 11px;
+  position: absolute; left: 8px; right: 8px; border-radius: 9px; padding: 5px 10px;
   background: color-mix(in srgb, var(--c) 16%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--c) 34%, transparent);
-  border-left: 3px solid var(--c); overflow: hidden; cursor: pointer;
-  transition: transform 0.15s ease;
+  border-left: 3px solid var(--c); overflow: hidden; cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  user-select: none; -webkit-user-select: none;
 }
 .tl-block:hover { transform: translateX(2px); }
-.tl-block .bt { font-weight: 600; font-size: 13px; line-height: 1.2; }
-.tl-block .bs { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; margin-top: 1px; }
-.tl-block .bk { font-size: 10px; color: var(--c); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.tl-block:active { cursor: grabbing; }
+.tl-block.dragging { opacity: 0.4; }
+.tl-block .bt { font-weight: 600; font-size: 12.5px; line-height: 1.2; }
+.tl-block .bs { font-size: 10.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; margin-top: 1px; }
+.tl-block .bk { font-size: 9.5px; color: var(--c); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+/* Action buttons are tucked away until hover (desktop) or tap-to-expand (touch) */
+.tl-block .tl-actions { display: none; flex-direction: column; gap: 4px; margin-top: 6px; }
+.tl-block:hover .tl-actions, .tl-block.expanded .tl-actions { display: flex; }
+.tl-track.drop-target {
+  background: color-mix(in srgb, var(--c, var(--text)) 7%, transparent);
+  outline: 1px dashed var(--line-strong); outline-offset: -2px; border-radius: 8px;
+}
 .tl-block.compact { display: flex; align-items: center; }
 .tl-block.compact .bt-row { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; overflow: hidden; }
 .tl-block.compact .bt { font-size: 13.5px; }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { timeToMinutes, minutesToTime } from '@/hooks/useClock'
 import type { Block, BlockStatus, AccentSlot } from '@/types'
 
 export interface RichBlock extends Omit<Block, 'sub_goal_id' | 'task_id'> {
@@ -165,5 +166,18 @@ export function useBlocks(date: string) {
     refetch()
   }
 
-  return { blocks, loading, setStatus, confirmPlannedAsDone, addBlock, editBlock, carryBlock, dropBlock, refetch }
+  /** Drag-to-reschedule: move a block to a new start (minutes since midnight),
+   *  preserving its duration. An untimed block becomes a 60-min timed block. */
+  async function moveBlock(block: RichBlock, startMinutes: number) {
+    const dur = block.start_time && block.end_time
+      ? Math.max(15, timeToMinutes(block.end_time) - timeToMinutes(block.start_time))
+      : 60
+    const start = minutesToTime(startMinutes)
+    const end = minutesToTime(startMinutes + dur)
+    if (start === block.start_time && end === block.end_time) return
+    await supabase.from('blocks').update({ start_time: start, end_time: end }).eq('id', block.id)
+    refetch()
+  }
+
+  return { blocks, loading, setStatus, confirmPlannedAsDone, addBlock, editBlock, carryBlock, dropBlock, moveBlock, refetch }
 }
