@@ -103,8 +103,16 @@ export function useProposals(date: string) {
           if (cadence <= 0) continue
           const scheduledThisWeek = weekCount[s.id] ?? 0
           if (cadence - scheduledThisWeek <= 0) continue
-          const slot = flexSlot(flexIndex++)
-          next.push({ subGoalId: s.id, title: s.title, bucketName, bucketColor, fixedDay: false, startTime: slot.startTime, endTime: slot.endTime, cadence, scheduledThisWeek })
+          // Honor the sub-goal's own time if set; else fall back to a stacked evening slot.
+          let startTime: string | null, endTime: string | null
+          if (s.recurrence_time) {
+            startTime = s.recurrence_time.slice(0, 5)
+            endTime = addMinutes(startTime, s.recurrence_duration_min ?? 60)
+          } else {
+            const slot = flexSlot(flexIndex++)
+            startTime = slot.startTime; endTime = slot.endTime
+          }
+          next.push({ subGoalId: s.id, title: s.title, bucketName, bucketColor, fixedDay: false, startTime, endTime, cadence, scheduledThisWeek })
         }
       }
 

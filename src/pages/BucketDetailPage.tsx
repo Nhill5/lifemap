@@ -228,7 +228,7 @@ function SubGoalForm({
     if (!title.trim()) return
     setSaving(true)
     try {
-      const recurrenceTime = fixedDay && repeatTime ? repeatTime : null
+      const recurrenceTime = type === 'schedule_it' && repeatTime ? repeatTime : null
       const recurrenceDurationMin = recurrenceTime
         ? (repeatEnd ? Math.max(15, timeToMinutes(repeatEnd) - timeToMinutes(repeatTime)) : 60)
         : null
@@ -290,8 +290,24 @@ function SubGoalForm({
 
       {type === 'schedule_it' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Time — always available, optional */}
+          <label style={{ fontSize: 11, color: 'var(--text-faint)' }}>Time (optional — leave blank for an untimed to-do)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <input
+              type="time" aria-label="Start time" value={repeatTime}
+              onChange={e => { setRepeatTime(e.target.value); if (e.target.value && !repeatEnd) setRepeatEnd(addMinutes(e.target.value, 60)) }}
+              style={inputStyle}
+            />
+            <input
+              type="time" aria-label="End time" value={repeatEnd} disabled={!repeatTime}
+              onChange={e => setRepeatEnd(e.target.value)}
+              style={{ ...inputStyle, opacity: repeatTime ? 1 : 0.5 }}
+            />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Start · End</div>
+
           {/* Repeat presets */}
-          <label style={{ fontSize: 11, color: 'var(--text-faint)' }}>Repeat</label>
+          <label style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>Repeat on</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {([
               { label: 'None', active: !fixedDay, on: () => setDays([]) },
@@ -319,26 +335,7 @@ function SubGoalForm({
             })}
           </div>
 
-          {fixedDay ? (
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>
-                Time (optional — leave blank for an untimed to-do)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <input
-                  type="time" aria-label="Start time" value={repeatTime}
-                  onChange={e => { setRepeatTime(e.target.value); if (e.target.value && !repeatEnd) setRepeatEnd(addMinutes(e.target.value, 60)) }}
-                  style={inputStyle}
-                />
-                <input
-                  type="time" aria-label="End time" value={repeatEnd} disabled={!repeatTime}
-                  onChange={e => setRepeatEnd(e.target.value)}
-                  style={{ ...inputStyle, opacity: repeatTime ? 1 : 0.5 }}
-                />
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>Start · End</div>
-            </div>
-          ) : (
+          {!fixedDay && (
             <div>
               <label style={{ fontSize: 11, color: 'var(--text-faint)', display: 'block', marginBottom: 4 }}>Times per week (flexible — choose days at planning)</label>
               <input type="number" inputMode="numeric" min={1} max={21} value={cadence} onChange={e => setCadence(e.target.value)} style={inputStyle} />
