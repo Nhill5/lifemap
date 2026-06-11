@@ -3,7 +3,12 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { urlBase64ToUint8Array } from '@/lib/notifications'
 
-const VAPID_PUBLIC = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
+// The VAPID *public* key is not a secret — it's the applicationServerKey sent to
+// the push service and embedded in the client. Use the env override if present,
+// else this baked-in default. (The matching PRIVATE key lives only in the
+// send-notification Edge Function's secrets.)
+const VAPID_PUBLIC = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined)
+  || 'BKwGXJt0yZWD-NDfAeHKjcHm-AFnrcjyvTHXAcs_zvTlvlNXVEWkv0NeSp8k0jx8HyWoI0e-9vsqrUOVJo9O3iQ'
 
 export function useNotifications() {
   const { user } = useAuth()
