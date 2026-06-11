@@ -16,13 +16,14 @@ export async function materializeRecurrence(params: {
   userId: string
   subGoalId: string
   title: string
+  description?: string | null
   days: number[] | null         // 0=Sun..6=Sat
   time: string | null           // 'HH:MM' or null (untimed)
   durationMin: number | null
   fromDate: string              // ISO start (inclusive)
   horizonDays?: number
 }): Promise<number> {
-  const { userId, subGoalId, title, days, time, durationMin, fromDate, horizonDays = RECUR_HORIZON_DAYS } = params
+  const { userId, subGoalId, title, description = null, days, time, durationMin, fromDate, horizonDays = RECUR_HORIZON_DAYS } = params
   if (!days || days.length === 0) return 0
 
   const startTime = time ? time.slice(0, 5) : null
@@ -32,13 +33,13 @@ export async function materializeRecurrence(params: {
   const have = new Set((existing ?? []).map(b => (b as { date: string }).date))
 
   const rows: {
-    user_id: string; sub_goal_id: string; source: 'sub_goal'; title: string
+    user_id: string; sub_goal_id: string; source: 'sub_goal'; title: string; description: string | null
     date: string; start_time: string | null; end_time: string | null; status: 'planned'
   }[] = []
   for (let i = 0; i <= horizonDays; i++) {
     const d = isoOffset(fromDate, i)
     if (days.includes(weekdayOf(d)) && !have.has(d)) {
-      rows.push({ user_id: userId, sub_goal_id: subGoalId, source: 'sub_goal', title, date: d, start_time: startTime, end_time: endTime, status: 'planned' })
+      rows.push({ user_id: userId, sub_goal_id: subGoalId, source: 'sub_goal', title, description: description || null, date: d, start_time: startTime, end_time: endTime, status: 'planned' })
     }
   }
   if (rows.length) await supabase.from('blocks').insert(rows)

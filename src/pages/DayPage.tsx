@@ -92,6 +92,7 @@ export interface AddSubmit {
   end: string
   isMajor: boolean
   days: number[]   // empty = one-off; non-empty = recurring (requires a bucket)
+  description: string
 }
 
 interface AddBlockFormProps {
@@ -103,6 +104,7 @@ interface AddBlockFormProps {
 function AddBlockForm({ buckets, onSubmit, onCancel }: AddBlockFormProps) {
   const [title, setTitle]       = useState('')
   const [bucketId, setBucketId] = useState<string>('')
+  const [description, setDescription] = useState('')
   const [startTime, setStartTime] = useState('')   // blank by default — never auto-stamped
   const [endTime, setEndTime]     = useState('')
   const [isMajor, setIsMajor]     = useState(false)
@@ -125,7 +127,7 @@ function AddBlockForm({ buckets, onSubmit, onCancel }: AddBlockFormProps) {
     const e = s ? (endTime.trim() || addMinutes(s, 60)) : ''
     setSaving(true)
     try {
-      await onSubmit({ title: title.trim(), bucketId: bucketId || null, timed: !!s, start: s, end: e, isMajor, days: [...days].sort() })
+      await onSubmit({ title: title.trim(), bucketId: bucketId || null, timed: !!s, start: s, end: e, isMajor, days: [...days].sort(), description: description.trim() })
     } finally { setSaving(false) }
   }
 
@@ -139,6 +141,9 @@ function AddBlockForm({ buckets, onSubmit, onCancel }: AddBlockFormProps) {
         <option value="">{repeating ? 'Pick a bucket (required to repeat)' : 'No bucket (external)'}</option>
         {buckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
+
+      <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description / notes (optional)" maxLength={2000} rows={2}
+        style={{ ...inputStyle, resize: 'vertical', minHeight: 56, lineHeight: 1.45 }} />
 
       {/* Time — always available, optional (blank = untimed to-do) */}
       <div>
@@ -210,6 +215,7 @@ interface InlineEditFormProps {
 function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditFormProps) {
   const [title, setTitle]         = useState(block.title)
   const [bucketId, setBucketId]   = useState<string>(block.bucket_id ?? '')
+  const [description, setDescription] = useState(block.description ?? '')
   const [timed, setTimed]         = useState(!!block.start_time)
   const [startTime, setStartTime] = useState(block.start_time ?? '09:00')
   const [endTime, setEndTime]     = useState(block.end_time ?? '10:00')
@@ -224,7 +230,7 @@ function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditF
     if (timed && (!startTime || !endTime)) return
     setSaving(true)
     try {
-      await onSave({ title: title.trim(), bucketId: bucketId || null, startTime: timed ? startTime : null, endTime: timed ? endTime : null, isMajor })
+      await onSave({ title: title.trim(), bucketId: bucketId || null, startTime: timed ? startTime : null, endTime: timed ? endTime : null, isMajor, description: description.trim() || null })
     } finally { setSaving(false) }
   }
 
@@ -238,6 +244,9 @@ function InlineEditForm({ block, buckets, onSave, onCancel, style }: InlineEditF
         <option value="">No bucket</option>
         {buckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
+
+      <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description / notes (optional)" maxLength={2000} rows={2}
+        style={{ ...inputStyle, resize: 'vertical', minHeight: 52, lineHeight: 1.45 }} />
 
       <ToggleRow value={timed} onChange={setTimed} label="Set a time" sub={timed ? 'a timed block' : 'untimed to-do'} />
       {timed && <TimeFields start={startTime} end={endTime} setStart={setStartTime} setEnd={setEndTime} />}
@@ -350,7 +359,7 @@ export function DayPage() {
     // Place the task on EVERY chosen weekday across the horizon, right now —
     // set it once, it's on the calendar for all those days (no per-day commit).
     await materializeRecurrence({
-      userId: user.id, subGoalId: sg.id, title: p.title,
+      userId: user.id, subGoalId: sg.id, title: p.title, description: p.description || null,
       days: p.days, time: p.timed ? p.start : null, durationMin, fromDate: dateParam,
     })
   }
@@ -364,7 +373,7 @@ export function DayPage() {
       await blocksHook.addBlock({
         title: p.title, bucketId: p.bucketId,
         startTime: p.timed ? p.start : null, endTime: p.timed ? p.end : null,
-        isMajor: p.isMajor,
+        isMajor: p.isMajor, description: p.description || null,
       })
     }
     setShowAddForm(false)
@@ -449,6 +458,7 @@ export function DayPage() {
         {bucket && <div className="bk">{bucket.name}</div>}
         <div className="bt">{block.title}</div>
         <div className="bs">{formatTimeRange(block.start_time, block.end_time)}</div>
+        {block.description && <div className="bn">{block.description}</div>}
 
         {/* Actions stay hidden until hover (desktop) or tap-to-expand (touch) */}
         <div className="tl-actions" onClick={e => e.stopPropagation()}>

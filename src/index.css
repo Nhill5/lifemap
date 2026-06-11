@@ -417,6 +417,7 @@ nav.seg button.mirror.on { background: var(--fitness); color: #06281c; }
 .tl-block .bt { font-weight: 600; font-size: 12.5px; line-height: 1.2; }
 .tl-block .bs { font-size: 10.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; margin-top: 1px; }
 .tl-block .bk { font-size: 9.5px; color: var(--c); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.tl-block .bn { font-size: 11px; color: var(--text-dim); margin-top: 3px; line-height: 1.35; max-width: 260px; white-space: pre-wrap; word-break: break-word; }
 /* Action buttons are tucked away until hover (desktop) or tap-to-expand (touch) */
 .tl-block .tl-actions { display: none; flex-direction: column; gap: 4px; margin-top: 6px; }
 .tl-block:hover .tl-actions, .tl-block.expanded .tl-actions { display: flex; }

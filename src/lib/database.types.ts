@@ -17,6 +17,7 @@ export type Database = {
       blocks: {
         Row: {
           date: string
+          description: string | null
           end_time: string | null
           id: string
           source: Database["public"]["Enums"]["block_source"]
@@ -29,6 +30,7 @@ export type Database = {
         }
         Insert: {
           date: string
+          description?: string | null
           end_time?: string | null
           id?: string
           source: Database["public"]["Enums"]["block_source"]
@@ -41,6 +43,7 @@ export type Database = {
         }
         Update: {
           date?: string
+          description?: string | null
           end_time?: string | null
           id?: string
           source?: Database["public"]["Enums"]["block_source"]

@@ -20,6 +20,7 @@ interface AddBlockParams {
   startTime: string | null   // null = untimed (a to-do for the day)
   endTime: string | null
   isMajor?: boolean
+  description?: string | null
 }
 
 export interface EditBlockParams {
@@ -28,6 +29,7 @@ export interface EditBlockParams {
   startTime: string | null
   endTime: string | null
   isMajor: boolean
+  description: string | null
 }
 
 type BucketRef = { id: string; name: string; color: string } | null
@@ -91,7 +93,7 @@ export function useBlocks(date: string) {
     refetch()
   }
 
-  async function addBlock({ title, bucketId, startTime, endTime, isMajor = false }: AddBlockParams) {
+  async function addBlock({ title, bucketId, startTime, endTime, isMajor = false, description = null }: AddBlockParams) {
     if (!user) return
     let taskId: string | null = null
     // A task is needed if there's a bucket OR the block is flagged major
@@ -107,6 +109,7 @@ export function useBlocks(date: string) {
     await supabase.from('blocks').insert({
       user_id: user.id,
       title,
+      description: description || null,
       date,
       start_time: startTime,
       end_time: endTime,
@@ -117,7 +120,7 @@ export function useBlocks(date: string) {
     refetch()
   }
 
-  async function editBlock(block: RichBlock, { title, bucketId, startTime, endTime, isMajor }: EditBlockParams) {
+  async function editBlock(block: RichBlock, { title, bucketId, startTime, endTime, isMajor, description }: EditBlockParams) {
     if (!user) return
     let taskId = block.task_id
 
@@ -139,6 +142,7 @@ export function useBlocks(date: string) {
 
     await supabase.from('blocks').update({
       title,
+      description: description || null,
       start_time: startTime,
       end_time: endTime,
       task_id: taskId,

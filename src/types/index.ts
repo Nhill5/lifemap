@@ -110,6 +110,7 @@ export interface Block {
   task_id: string | null
   source: BlockSource
   title: string
+  description: string | null        // optional free-text notes
   date: string                      // ISO date
   start_time: string | null         // HH:MM — null = untimed (a to-do for the day)
   end_time: string | null
