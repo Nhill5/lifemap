@@ -7,10 +7,11 @@ import webpush from "https://esm.sh/web-push@3.6.7"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-const NOTIFY_SECRET = Deno.env.get("NOTIFY_SECRET") ?? ""
-const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY") ?? ""
-const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") ?? ""
-const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:hello@lifemap.app"
+// .trim() guards against trailing whitespace pasted into the secret editor.
+const NOTIFY_SECRET = (Deno.env.get("NOTIFY_SECRET") ?? "").trim()
+const VAPID_PUBLIC = (Deno.env.get("VAPID_PUBLIC_KEY") ?? "").trim()
+const VAPID_PRIVATE = (Deno.env.get("VAPID_PRIVATE_KEY") ?? "").trim()
+const VAPID_SUBJECT = (Deno.env.get("VAPID_SUBJECT") ?? "mailto:hello@lifemap.app").trim()
 
 const DAILY_BUDGET = 4
 const json = (b: unknown, status = 200) =>
@@ -45,7 +46,6 @@ Deno.serve(async (req) => {
 
   const svc = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } })
 
-  // Timezone-aware budget + quiet-hours gate
   const { data: profile } = await svc.from("profiles").select("timezone, quiet_hours").eq("id", user_id).maybeSingle()
   const tz = profile?.timezone ?? "UTC"
   const date = todayInTz(tz)
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     } catch (e) {
       const status = (e as { statusCode?: number }).statusCode
       if (status === 404 || status === 410) {
-        await svc.from("push_subscriptions").delete().eq("endpoint", s.endpoint) // stale endpoint
+        await svc.from("push_subscriptions").delete().eq("endpoint", s.endpoint)
       }
     }
   }

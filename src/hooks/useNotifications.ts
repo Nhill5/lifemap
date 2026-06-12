@@ -8,7 +8,7 @@ import { urlBase64ToUint8Array } from '@/lib/notifications'
 // else this baked-in default. (The matching PRIVATE key lives only in the
 // send-notification Edge Function's secrets.)
 const VAPID_PUBLIC = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined)
-  || 'BKwGXJt0yZWD-NDfAeHKjcHm-AFnrcjyvTHXAcs_zvTlvlNXVEWkv0NeSp8k0jx8HyWoI0e-9vsqrUOVJo9O3iQ'
+  || 'BHMF4Jmr4nwqU4Pdeh5KQyUzBVWxKyLjptUD6NN40a-gG1cGUXXC9dqRxOlk8A-VAiKzJ2PcPXVsEUBZRMwrLI8'
 
 export function useNotifications() {
   const { user } = useAuth()
