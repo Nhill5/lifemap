@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback, type CSSProperties, type PointerEvent } from 'react'
 import type { SceneElement } from '@/hooks/useBucketNotes'
 
-type Tool = 'pen' | 'eraser' | 'text'
+type Tool = 'pen' | 'eraser' | 'text' | 'move'
 
 const PALETTE = ['#ECEAE3', '#5FD39E', '#F4B14C', '#6FA8FF', '#C58CF0', '#FF8C8C']
 const WIDTHS = [2, 4, 8, 16]
@@ -22,6 +22,7 @@ export function SketchCanvas({
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<SceneElement[]>(initialScene)
   const draftRef = useRef<{ color: string; width: number; erase: boolean; points: [number, number][] } | null>(null)
+  const dragRef = useRef<{ index: number; startX: number; startY: number; orig: SceneElement; moved: boolean } | null>(null)
   const dprRef = useRef(1)
 
   const [tool, setTool] = useState<Tool>('pen')
@@ -95,6 +96,34 @@ export function SketchCanvas({
     return [e.clientX - rect.left, e.clientY - rect.top]
   }
 
+  function cloneEl(el: SceneElement): SceneElement {
+    return el.type === 'stroke'
+      ? { ...el, points: el.points.map(pt => [pt[0], pt[1]] as [number, number]) }
+      : { ...el }
+  }
+
+  /** Topmost element under the point (text by its box, strokes by bounding box). */
+  function hitTest(p: [number, number]): number {
+    const c = ctx()
+    for (let i = sceneRef.current.length - 1; i >= 0; i--) {
+      const el = sceneRef.current[i]
+      if (el.type === 'text') {
+        if (c) c.font = `${el.size}px "Hanken Grotesk", system-ui, sans-serif`
+        const lines = el.text.split('\n')
+        let maxW = 0
+        for (const ln of lines) maxW = Math.max(maxW, c ? c.measureText(ln).width : ln.length * el.size * 0.6)
+        const h = lines.length * el.size * 1.25
+        if (p[0] >= el.x - 6 && p[0] <= el.x + maxW + 6 && p[1] >= el.y - 6 && p[1] <= el.y + h + 6) return i
+      } else {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        for (const [x, y] of el.points) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
+        const tol = el.width / 2 + 8
+        if (p[0] >= minX - tol && p[0] <= maxX + tol && p[1] >= minY - tol && p[1] <= maxY + tol) return i
+      }
+    }
+    return -1
+  }
+
   function commit() {
     onChange([...sceneRef.current])
     force(n => n + 1)
@@ -110,11 +139,31 @@ export function SketchCanvas({
       }
       return
     }
+    if (tool === 'move') {
+      const idx = hitTest(p)
+      if (idx >= 0) {
+        canvasRef.current?.setPointerCapture(e.pointerId)
+        dragRef.current = { index: idx, startX: p[0], startY: p[1], orig: cloneEl(sceneRef.current[idx]), moved: false }
+      }
+      return
+    }
     canvasRef.current?.setPointerCapture(e.pointerId)
     draftRef.current = { color, width: tool === 'eraser' ? width * 3 : width, erase: tool === 'eraser', points: [p] }
   }
 
   function onPointerMove(e: PointerEvent<HTMLCanvasElement>) {
+    const drag = dragRef.current
+    if (drag) {
+      const p = pointFromEvent(e)
+      const dx = p[0] - drag.startX, dy = p[1] - drag.startY
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) drag.moved = true
+      const el = drag.orig
+      sceneRef.current[drag.index] = el.type === 'text'
+        ? { ...el, x: el.x + dx, y: el.y + dy }
+        : { ...el, points: el.points.map(([x, y]) => [x + dx, y + dy] as [number, number]) }
+      redraw()
+      return
+    }
     const d = draftRef.current
     if (!d) return
     const p = pointFromEvent(e)
@@ -127,7 +176,23 @@ export function SketchCanvas({
     }
   }
 
-  function endStroke() {
+  function onPointerUp() {
+    const drag = dragRef.current
+    if (drag) {
+      dragRef.current = null
+      const el = sceneRef.current[drag.index]
+      // A tap (no real movement) on a text element re-edits it; blank deletes it.
+      if (!drag.moved && el?.type === 'text') {
+        const next = window.prompt('Edit text', el.text)
+        if (next !== null) {
+          if (next.trim() === '') sceneRef.current.splice(drag.index, 1)
+          else sceneRef.current[drag.index] = { ...el, text: next.trim() }
+          redraw()
+        }
+      }
+      commit()
+      return
+    }
     const d = draftRef.current
     draftRef.current = null
     if (!d || d.points.length === 0) return
@@ -160,6 +225,7 @@ export function SketchCanvas({
           <button style={toolBtn(tool === 'pen')} onClick={() => setTool('pen')}>✎ Pen</button>
           <button style={toolBtn(tool === 'eraser')} onClick={() => setTool('eraser')}>Eraser</button>
           <button style={toolBtn(tool === 'text')} onClick={() => setTool('text')}>T</button>
+          <button style={toolBtn(tool === 'move')} onClick={() => setTool('move')}>✥ Move</button>
         </div>
 
         <div style={{ width: 1, height: 22, background: 'var(--line)' }} />
@@ -216,10 +282,10 @@ export function SketchCanvas({
           ref={canvasRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
-          onPointerUp={endStroke}
-          onPointerCancel={endStroke}
-          onPointerLeave={endStroke}
-          style={{ display: 'block', cursor: tool === 'text' ? 'text' : 'crosshair' }}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onPointerLeave={onPointerUp}
+          style={{ display: 'block', cursor: tool === 'move' ? 'move' : tool === 'text' ? 'text' : 'crosshair' }}
         />
       </div>
     </div>
