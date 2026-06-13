@@ -31,7 +31,7 @@ type WeRow = {
 
 type PriorRow = {
   exercise_id: string
-  workouts: { date: string } | null
+  workouts: { date: string; name: string | null } | null
   workout_sets: { reps: number | null; weight: number | null; unit: 'lb' | 'kg'; set_number: number; id: string }[]
 }
 
@@ -104,7 +104,7 @@ export function useWorkout(opts: UseWorkoutOpts = {}) {
       const priorRes = exIds.length
         ? await supabase
             .from('workout_exercises')
-            .select('exercise_id, workouts!inner(date), workout_sets(id, set_number, reps, weight, unit)')
+            .select('exercise_id, workouts!inner(date, name), workout_sets(id, set_number, reps, weight, unit)')
             .eq('workouts.user_id', user.id)
             .lt('workouts.date', woDate)
             .in('exercise_id', exIds)
@@ -118,13 +118,20 @@ export function useWorkout(opts: UseWorkoutOpts = {}) {
 
       const session: SessionExercise[] = weRows.map(w => {
         const priors = priorByEx[w.exercise_id] ?? []
+        // PR is all-time, across every session that ever included this exercise.
         let prBest = 0
-        let latestDate = ''
-        let lastSets: SessionSet[] = []
         for (const p of priors) {
           for (const s of p.workout_sets) {
             if (s.weight != null && s.weight > prBest) prBest = s.weight
           }
+        }
+        // "Last time" is scoped to the same named workout (your split day) when
+        // this session is named — so reopening "Upper A" shows last Upper A.
+        // Unnamed sessions fall back to the most recent session with this exercise.
+        const scoped = woName ? priors.filter(p => (p.workouts?.name ?? null) === woName) : priors
+        let latestDate = ''
+        let lastSets: SessionSet[] = []
+        for (const p of scoped) {
           const d = p.workouts?.date ?? ''
           if (d > latestDate) {
             latestDate = d
@@ -172,6 +179,7 @@ export function useWorkout(opts: UseWorkoutOpts = {}) {
     const clean = next?.trim() || null
     await supabase.from('workouts').update({ name: clean }).eq('id', wid)
     setName(clean)
+    refetch() // re-scope "last time" to the new name (your split day)
   }
 
   async function addExercise(exerciseId: string) {

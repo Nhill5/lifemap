@@ -179,6 +179,17 @@ function ExerciseCard({
 
   const nextNum = (ex.sets.length ? ex.sets[ex.sets.length - 1].set_number : 0) + 1
   const prevForNext = ex.lastSets.find(s => s.set_number === nextNum)
+
+  // Pre-fill the new-set inputs with last time's numbers for THIS set, so a
+  // progressive-overload session is "see last week → bump → save". Re-syncs when
+  // the set advances (after a save) or the reference changes (e.g. a rename).
+  useEffect(() => {
+    setReps(prevForNext?.reps != null ? String(prevForNext.reps) : '')
+    setWeight(prevForNext?.weight != null ? String(prevForNext.weight) : '')
+    if (prevForNext?.unit) setUnit(prevForNext.unit)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextNum, prevForNext?.reps, prevForNext?.weight, prevForNext?.unit])
+
   const wNum = weight.trim() === '' ? null : Number(weight)
   const wouldPr = wNum != null && ex.prBest > 0 && wNum > ex.prBest
 
@@ -187,8 +198,8 @@ function ExerciseCard({
     setSaving(true)
     try {
       await onAddSet(reps.trim() === '' ? null : Number(reps), wNum, unit)
-      setReps(''); setWeight('')
       onRest() // a logged set is the natural moment to start the rest clock
+      // inputs repopulate to the next set's last-time numbers via the effect
     } finally { setSaving(false) }
   }
 
