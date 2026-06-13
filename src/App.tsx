@@ -12,6 +12,7 @@ import { DayPage }           from '@/pages/DayPage'
 import { WeekPage }          from '@/pages/WeekPage'
 import { BucketsPage }       from '@/pages/BucketsPage'
 import { BucketDetailPage }  from '@/pages/BucketDetailPage'
+import { BucketNotesPage, NoteEditorPage } from '@/pages/BucketNotesPage'
 import { EveningMirrorPage } from '@/pages/EveningMirrorPage'
 import { WeeklyMirrorPage }  from '@/pages/WeeklyMirrorPage'
 import { WorkoutPage }       from '@/pages/WorkoutPage'
@@ -46,6 +47,14 @@ const router = createBrowserRouter([
   {
     path: '/buckets/:id',
     element: <ProtectedRoute><BucketDetailPage /></ProtectedRoute>,
+  },
+  {
+    path: '/buckets/:id/notes',
+    element: <ProtectedRoute><BucketNotesPage /></ProtectedRoute>,
+  },
+  {
+    path: '/buckets/:id/notes/:noteId',
+    element: <ProtectedRoute><NoteEditorPage /></ProtectedRoute>,
   },
   {
     path: '/mirror/evening',

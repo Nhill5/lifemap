@@ -615,6 +615,13 @@ export function BucketDetailPage() {
         </div>
       )}
 
+      {/* Notes & sketches — a freeform canvas per bucket */}
+      <div style={{ marginTop: 12 }}>
+        <Button onClick={() => navigate(`/buckets/${bucket.id}/notes`)} style={{ width: '100%' }}>
+          Notes &amp; sketches →
+        </Button>
+      </div>
+
       {/* Track-it meters */}
       {meters.length > 0 && (
         <div className="reveal" style={{ '--d': '0.1s', marginTop: 30 } as CSSProperties}>
