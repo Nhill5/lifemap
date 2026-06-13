@@ -718,6 +718,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          name: string | null
           user_id: string
         }
         Insert: {
@@ -725,6 +726,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          name?: string | null
           user_id: string
         }
         Update: {
@@ -732,6 +734,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          name?: string | null
           user_id?: string
         }
         Relationships: [
@@ -740,6 +743,101 @@ export type Database = {
             columns: ["block_id"]
             isOneToOne: false
             referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_templates: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workout_template_exercises: {
+        Row: {
+          exercise_id: string
+          id: string
+          sort_order: number
+          template_id: string
+        }
+        Insert: {
+          exercise_id: string
+          id?: string
+          sort_order?: number
+          template_id: string
+        }
+        Update: {
+          exercise_id?: string
+          id?: string
+          sort_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_template_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_template_exercises_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workout_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bucket_notes: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          id: string
+          scene: Json
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          id?: string
+          scene?: Json
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          id?: string
+          scene?: Json
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bucket_notes_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
             referencedColumns: ["id"]
           },
         ]

@@ -605,9 +605,12 @@ export function BucketDetailPage() {
 
       {/* Workout logger entry — the most-central bucket's daily ritual (§17) */}
       {bucket.color === 'fitness' && (
-        <div style={{ marginTop: 16 }}>
-          <Button onClick={() => navigate('/workout')} style={{ width: '100%' }}>
+        <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+          <Button onClick={() => navigate('/workout')} style={{ flex: 1 }}>
             Log a workout →
+          </Button>
+          <Button onClick={() => navigate('/workouts')} style={{ flex: 1 }}>
+            Workout book →
           </Button>
         </div>
       )}

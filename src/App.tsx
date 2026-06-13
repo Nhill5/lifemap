@@ -15,6 +15,7 @@ import { BucketDetailPage }  from '@/pages/BucketDetailPage'
 import { EveningMirrorPage } from '@/pages/EveningMirrorPage'
 import { WeeklyMirrorPage }  from '@/pages/WeeklyMirrorPage'
 import { WorkoutPage }       from '@/pages/WorkoutPage'
+import { WorkoutBookPage }   from '@/pages/WorkoutBookPage'
 import { SettingsPage }      from '@/pages/SettingsPage'
 
 const router = createBrowserRouter([
@@ -55,7 +56,15 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><WeeklyMirrorPage /></ProtectedRoute>,
   },
   {
+    path: '/workouts',
+    element: <ProtectedRoute><WorkoutBookPage /></ProtectedRoute>,
+  },
+  {
     path: '/workout',
+    element: <ProtectedRoute><WorkoutPage /></ProtectedRoute>,
+  },
+  {
+    path: '/workout/session/:sessionId',
     element: <ProtectedRoute><WorkoutPage /></ProtectedRoute>,
   },
   {

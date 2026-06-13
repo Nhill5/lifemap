@@ -35,11 +35,21 @@ type PriorRow = {
   workout_sets: { reps: number | null; weight: number | null; unit: 'lb' | 'kg'; set_number: number; id: string }[]
 }
 
-export function useWorkout(blockId?: string) {
+export interface UseWorkoutOpts {
+  /** Bind the session to a planned gym block (today). */
+  blockId?: string
+  /** Open a specific existing session by id — the "edit a past workout" path. */
+  sessionId?: string
+}
+
+export function useWorkout(opts: UseWorkoutOpts = {}) {
+  const { blockId, sessionId } = opts
   const { user } = useAuth()
   const today = useToday()
 
-  const [workoutId, setWorkoutId] = useState<string | null>(null)
+  const [workoutId, setWorkoutId] = useState<string | null>(sessionId ?? null)
+  const [name, setName] = useState<string | null>(null)
+  const [date, setDate] = useState<string>(today)
   const [exercises, setExercises] = useState<SessionExercise[]>([])
   const [loading, setLoading] = useState(true)
   const [tick, setTick] = useState(0)
@@ -51,15 +61,30 @@ export function useWorkout(blockId?: string) {
     setLoading(true)
 
     ;(async () => {
-      // Find the session: by block if provided, else today's blockless workout
-      const q = supabase.from('workouts').select('id').eq('user_id', user.id)
-      const woRes = blockId
-        ? await q.eq('block_id', blockId).maybeSingle()
-        : await q.eq('date', today).is('block_id', null).maybeSingle()
+      // Resolve the session: explicit id → by block → today's blockless workout.
+      let wid: string | null = null
+      let woName: string | null = null
+      let woDate = today
+      if (sessionId) {
+        const { data } = await supabase.from('workouts').select('id, name, date')
+          .eq('user_id', user.id).eq('id', sessionId).maybeSingle()
+        wid = (data?.id ?? null) as string | null
+        woName = (data?.name ?? null) as string | null
+        woDate = (data?.date ?? today) as string
+      } else {
+        const q = supabase.from('workouts').select('id, name, date').eq('user_id', user.id)
+        const woRes = blockId
+          ? await q.eq('block_id', blockId).maybeSingle()
+          : await q.eq('date', today).is('block_id', null).maybeSingle()
+        wid = (woRes.data?.id ?? null) as string | null
+        woName = (woRes.data?.name ?? null) as string | null
+        woDate = (woRes.data?.date ?? today) as string
+      }
       if (cancelled) return
 
-      const wid = (woRes.data?.id ?? null) as string | null
       setWorkoutId(wid)
+      setName(woName)
+      setDate(woDate)
 
       if (!wid) { setExercises([]); setLoading(false); return }
 
@@ -73,13 +98,15 @@ export function useWorkout(blockId?: string) {
       const weRows = (weRes.data ?? []) as unknown as WeRow[]
       const exIds = [...new Set(weRows.map(w => w.exercise_id))]
 
-      // Prior history for these exercises (date < today) → last session + all-time best
+      // Prior history for these exercises (date < this session's date) → last
+      // session + all-time best. Anchoring on the session date (not "today")
+      // keeps "last time" correct when editing an older workout.
       const priorRes = exIds.length
         ? await supabase
             .from('workout_exercises')
             .select('exercise_id, workouts!inner(date), workout_sets(id, set_number, reps, weight, unit)')
             .eq('workouts.user_id', user.id)
-            .lt('workouts.date', today)
+            .lt('workouts.date', woDate)
             .in('exercise_id', exIds)
         : { data: [] as PriorRow[] }
       if (cancelled) return
@@ -120,7 +147,7 @@ export function useWorkout(blockId?: string) {
     })()
 
     return () => { cancelled = true }
-  }, [user, today, blockId, tick])
+  }, [user, today, blockId, sessionId, tick])
 
   /** Create the workout row on first use; links + confirms the gym block. */
   async function ensureWorkout(): Promise<string | null> {
@@ -138,6 +165,15 @@ export function useWorkout(blockId?: string) {
     return wid
   }
 
+  /** Rename the session (Upper/Lower/Push/Pull/…). Creates the row if needed. */
+  async function rename(next: string | null) {
+    const wid = await ensureWorkout()
+    if (!wid) return
+    const clean = next?.trim() || null
+    await supabase.from('workouts').update({ name: clean }).eq('id', wid)
+    setName(clean)
+  }
+
   async function addExercise(exerciseId: string) {
     if (!user) return
     const wid = await ensureWorkout()
@@ -153,14 +189,28 @@ export function useWorkout(blockId?: string) {
     refetch()
   }
 
+  function isPrWeight(ex: SessionExercise, weight: number | null): boolean {
+    return weight != null && ex.prBest > 0 && weight > ex.prBest
+  }
+
   /** Add a set. Returns true if it's a new PR (beats all prior history). */
   async function addSet(ex: SessionExercise, reps: number | null, weight: number | null, unit: 'lb' | 'kg'): Promise<boolean> {
-    const nextNum = (ex.sets.at(-1)?.set_number ?? 0) + 1
+    const nextNum = (ex.sets.length ? ex.sets[ex.sets.length - 1].set_number : 0) + 1
     await supabase.from('workout_sets').insert({
       workout_exercise_id: ex.weId, set_number: nextNum, reps, weight, unit,
     })
     refetch()
-    return weight != null && ex.prBest > 0 && weight > ex.prBest
+    return isPrWeight(ex, weight)
+  }
+
+  /** Edit an already-logged set in place. Returns true if the new weight is a PR. */
+  async function updateSet(
+    ex: SessionExercise, setId: string,
+    patch: { reps?: number | null; weight?: number | null; unit?: 'lb' | 'kg' },
+  ): Promise<boolean> {
+    await supabase.from('workout_sets').update(patch).eq('id', setId)
+    refetch()
+    return patch.weight !== undefined ? isPrWeight(ex, patch.weight ?? null) : false
   }
 
   async function deleteSet(setId: string) {
@@ -168,5 +218,50 @@ export function useWorkout(blockId?: string) {
     refetch()
   }
 
-  return { workoutId, exercises, loading, addExercise, removeExercise, addSet, deleteSet, refetch }
+  /** Pre-fill this session's exercises from a saved routine. */
+  async function startFromTemplate(templateId: string) {
+    if (!user) return
+    const wid = await ensureWorkout()
+    if (!wid) return
+    const { data } = await supabase
+      .from('workout_template_exercises')
+      .select('exercise_id, sort_order')
+      .eq('template_id', templateId)
+      .order('sort_order')
+    const rows = (data ?? []) as { exercise_id: string; sort_order: number }[]
+    if (rows.length === 0) return
+    const base = exercises.length
+    await supabase.from('workout_exercises').insert(
+      rows.map((r, i) => ({ workout_id: wid, exercise_id: r.exercise_id, sort_order: base + i })),
+    )
+    // A template often implies the name (e.g. "Upper A"); adopt it if unnamed.
+    if (!name) {
+      const { data: tpl } = await supabase.from('workout_templates').select('name').eq('id', templateId).maybeSingle()
+      if (tpl?.name) await rename(tpl.name as string)
+    }
+    refetch()
+  }
+
+  /** Save the current exercise list as a reusable named routine. */
+  async function saveAsTemplate(templateName: string): Promise<boolean> {
+    if (!user || exercises.length === 0) return false
+    const { data: tpl } = await supabase
+      .from('workout_templates')
+      .insert({ user_id: user.id, name: templateName.trim() })
+      .select('id')
+      .single()
+    const tid = (tpl?.id ?? null) as string | null
+    if (!tid) return false
+    await supabase.from('workout_template_exercises').insert(
+      exercises.map((ex, i) => ({ template_id: tid, exercise_id: ex.exerciseId, sort_order: i })),
+    )
+    return true
+  }
+
+  return {
+    workoutId, name, date, exercises, loading,
+    rename, addExercise, removeExercise,
+    addSet, updateSet, deleteSet,
+    startFromTemplate, saveAsTemplate, refetch,
+  }
 }
