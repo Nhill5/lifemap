@@ -17,10 +17,11 @@ export type Database = {
       blocks: {
         Row: {
           date: string
-          end_time: string
+          description: string | null
+          end_time: string | null
           id: string
           source: Database["public"]["Enums"]["block_source"]
-          start_time: string
+          start_time: string | null
           status: Database["public"]["Enums"]["block_status"]
           sub_goal_id: string | null
           task_id: string | null
@@ -29,10 +30,11 @@ export type Database = {
         }
         Insert: {
           date: string
-          end_time: string
+          description?: string | null
+          end_time?: string | null
           id?: string
           source: Database["public"]["Enums"]["block_source"]
-          start_time: string
+          start_time?: string | null
           status?: Database["public"]["Enums"]["block_status"]
           sub_goal_id?: string | null
           task_id?: string | null
@@ -41,10 +43,11 @@ export type Database = {
         }
         Update: {
           date?: string
-          end_time?: string
+          description?: string | null
+          end_time?: string | null
           id?: string
           source?: Database["public"]["Enums"]["block_source"]
-          start_time?: string
+          start_time?: string | null
           status?: Database["public"]["Enums"]["block_status"]
           sub_goal_id?: string | null
           task_id?: string | null
@@ -151,6 +154,41 @@ export type Database = {
           },
         ]
       }
+      chief_goal_progress: {
+        Row: {
+          chief_goal_id: string
+          created_at: string
+          date: string
+          id: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          chief_goal_id: string
+          created_at?: string
+          date: string
+          id?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          chief_goal_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chief_goal_progress_chief_goal_id_fkey"
+            columns: ["chief_goal_id"]
+            isOneToOne: false
+            referencedRelation: "chief_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       day_plans: {
         Row: {
           committed_at: string | null
@@ -244,6 +282,27 @@ export type Database = {
           synced_at?: string
           user_id?: string
           value?: number
+        }
+        Relationships: []
+      }
+      fitbit_connections: {
+        Row: {
+          connected_at: string
+          last_sync_at: string | null
+          scopes: string | null
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          last_sync_at?: string | null
+          scopes?: string | null
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          last_sync_at?: string | null
+          scopes?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -367,6 +426,33 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sub_goals: {
         Row: {
           bucket_id: string
@@ -376,6 +462,9 @@ export type Database = {
           daily_target: number | null
           data_source: Database["public"]["Enums"]["data_source"]
           id: string
+          recurrence_days: number[] | null
+          recurrence_duration_min: number | null
+          recurrence_time: string | null
           status: Database["public"]["Enums"]["goal_status"]
           target_unit: string | null
           title: string
@@ -390,6 +479,9 @@ export type Database = {
           daily_target?: number | null
           data_source?: Database["public"]["Enums"]["data_source"]
           id?: string
+          recurrence_days?: number[] | null
+          recurrence_duration_min?: number | null
+          recurrence_time?: string | null
           status?: Database["public"]["Enums"]["goal_status"]
           target_unit?: string | null
           title: string
@@ -404,6 +496,9 @@ export type Database = {
           daily_target?: number | null
           data_source?: Database["public"]["Enums"]["data_source"]
           id?: string
+          recurrence_days?: number[] | null
+          recurrence_duration_min?: number | null
+          recurrence_time?: string | null
           status?: Database["public"]["Enums"]["goal_status"]
           target_unit?: string | null
           title?: string
@@ -435,6 +530,7 @@ export type Database = {
           created_at: string
           due_date: string | null
           id: string
+          is_major: boolean
           rollover_count: number
           status: Database["public"]["Enums"]["task_status"]
           title: string
@@ -447,6 +543,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          is_major?: boolean
           rollover_count?: number
           status?: Database["public"]["Enums"]["task_status"]
           title: string
@@ -459,6 +556,7 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           id?: string
+          is_major?: boolean
           rollover_count?: number
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
@@ -620,6 +718,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          name: string | null
           user_id: string
         }
         Insert: {
@@ -627,6 +726,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          name?: string | null
           user_id: string
         }
         Update: {
@@ -634,6 +734,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          name?: string | null
           user_id?: string
         }
         Relationships: [
@@ -646,18 +747,116 @@ export type Database = {
           },
         ]
       }
+      workout_templates: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workout_template_exercises: {
+        Row: {
+          exercise_id: string
+          id: string
+          sort_order: number
+          template_id: string
+        }
+        Insert: {
+          exercise_id: string
+          id?: string
+          sort_order?: number
+          template_id: string
+        }
+        Update: {
+          exercise_id?: string
+          id?: string
+          sort_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_template_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_template_exercises_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workout_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bucket_notes: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          id: string
+          scene: Json
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          id?: string
+          scene?: Json
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          id?: string
+          scene?: Json
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bucket_notes_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      complete_onboarding: {
+        Args: { p_buckets: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       accent_slot: "school" | "work" | "fitness" | "looks" | "hobby"
       accountability_dial: "gentle" | "balanced" | "drill"
       block_source: "sub_goal" | "task" | "external"
-      block_status: "planned" | "done" | "missed" | "moved"
+      block_status: "planned" | "done" | "missed" | "moved" | "dropped"
       bucket_state: "thriving" | "steady" | "wilting" | "parked"
       data_source: "manual" | "fitbit" | "workout_logger"
       event_type:
@@ -800,7 +999,7 @@ export const Constants = {
       accent_slot: ["school", "work", "fitness", "looks", "hobby"],
       accountability_dial: ["gentle", "balanced", "drill"],
       block_source: ["sub_goal", "task", "external"],
-      block_status: ["planned", "done", "missed", "moved"],
+      block_status: ["planned", "done", "missed", "moved", "dropped"],
       bucket_state: ["thriving", "steady", "wilting", "parked"],
       data_source: ["manual", "fitbit", "workout_logger"],
       event_type: ["task", "subgoal", "milestone", "chief_goal", "unlock", "comeback", "PR"],
