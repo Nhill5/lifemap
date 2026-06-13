@@ -237,7 +237,12 @@ export function useWorkout(opts: UseWorkoutOpts = {}) {
     refetch()
   }
 
-  /** Pre-fill this session's exercises from a saved routine. */
+  /**
+   * Pre-fill this session's exercises from a saved routine — AND seed each
+   * exercise with last time's full set scheme (reps/weight/unit), so the day
+   * opens fully populated and you just adjust the numbers you beat. Last time is
+   * the same-named day if it exists, else the most recent session with the lift.
+   */
   async function startFromTemplate(templateId: string) {
     if (!user) return
     const wid = await ensureWorkout()
@@ -249,15 +254,46 @@ export function useWorkout(opts: UseWorkoutOpts = {}) {
       .order('sort_order')
     const rows = (data ?? []) as { exercise_id: string; sort_order: number }[]
     if (rows.length === 0) return
+
     const base = exercises.length
-    await supabase.from('workout_exercises').insert(
+    const { data: insertedWe } = await supabase.from('workout_exercises').insert(
       rows.map((r, i) => ({ workout_id: wid, exercise_id: r.exercise_id, sort_order: base + i })),
-    )
+    ).select('id, exercise_id')
+
     // A template often implies the name (e.g. "Upper A"); adopt it if unnamed.
+    let effectiveName = name
     if (!name) {
       const { data: tpl } = await supabase.from('workout_templates').select('name').eq('id', templateId).maybeSingle()
-      if (tpl?.name) await rename(tpl.name as string)
+      if (tpl?.name) { await supabase.from('workouts').update({ name: tpl.name }).eq('id', wid); effectiveName = tpl.name as string }
     }
+
+    // Seed sets from last time for each exercise.
+    const exIds = rows.map(r => r.exercise_id)
+    const { data: priorData } = await supabase
+      .from('workout_exercises')
+      .select('exercise_id, workouts!inner(date, name), workout_sets(set_number, reps, weight, unit)')
+      .eq('workouts.user_id', user.id)
+      .lt('workouts.date', today)
+      .in('exercise_id', exIds)
+    type PR = { exercise_id: string; workouts: { date: string; name: string | null } | null; workout_sets: { set_number: number; reps: number | null; weight: number | null; unit: 'lb' | 'kg' }[] }
+    const byEx: Record<string, PR[]> = {}
+    for (const r of (priorData ?? []) as unknown as PR[]) (byEx[r.exercise_id] ??= []).push(r)
+    const pickLast = (exId: string) => {
+      const all = byEx[exId] ?? []
+      const sameName = effectiveName ? all.filter(r => (r.workouts?.name ?? null) === effectiveName) : []
+      const pool = sameName.length ? sameName : all
+      let latest = ''; let sets: PR['workout_sets'] = []
+      for (const r of pool) { const d = r.workouts?.date ?? ''; if (d > latest) { latest = d; sets = r.workout_sets ?? [] } }
+      return [...sets].sort((a, b) => a.set_number - b.set_number)
+    }
+    const seed: { workout_exercise_id: string; set_number: number; reps: number | null; weight: number | null; unit: 'lb' | 'kg' }[] = []
+    for (const we of (insertedWe ?? []) as { id: string; exercise_id: string }[]) {
+      for (const s of pickLast(we.exercise_id)) {
+        seed.push({ workout_exercise_id: we.id, set_number: s.set_number, reps: s.reps, weight: s.weight, unit: s.unit })
+      }
+    }
+    if (seed.length) await supabase.from('workout_sets').insert(seed)
+
     refetch()
   }
 
