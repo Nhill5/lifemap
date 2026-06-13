@@ -60,8 +60,15 @@ function TemplateRow({ t, onStart, onDelete }: { t: TemplateSummary; onStart: ()
 
 export function WorkoutBookPage() {
   const navigate = useNavigate()
-  const { workouts, loading } = useWorkoutHistory()
+  const { workouts, loading, createWorkout } = useWorkoutHistory()
   const { templates, deleteTemplate } = useWorkoutTemplates()
+
+  // Starting a routine makes its OWN session (named after the routine) so it
+  // never merges into a workout you already logged today.
+  async function startRoutine(templateId: string, name: string) {
+    const id = await createWorkout(name)
+    if (id) navigate(`/workout/session/${id}?template=${templateId}`)
+  }
 
   return (
     <AppShell>
@@ -89,7 +96,7 @@ export function WorkoutBookPage() {
               <TemplateRow
                 key={t.id}
                 t={t}
-                onStart={() => navigate(`/workout?template=${t.id}`)}
+                onStart={() => startRoutine(t.id, t.name)}
                 onDelete={() => deleteTemplate(t.id)}
               />
             ))}

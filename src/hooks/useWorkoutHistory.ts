@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToday } from '@/hooks/useToday'
 
 export interface WorkoutSummary {
   id: string
@@ -24,6 +25,7 @@ type Row = {
 /** Past sessions, newest first — the "book" you can flip back through. */
 export function useWorkoutHistory() {
   const { user } = useAuth()
+  const today = useToday()
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [tick, setTick] = useState(0)
@@ -71,5 +73,18 @@ export function useWorkoutHistory() {
     return () => { cancelled = true }
   }, [user, tick])
 
-  return { workouts, loading, refetch }
+  /** Create a fresh blockless session for today (used to start a routine as its
+   *  own workout instead of appending to today's). Returns the new id. */
+  async function createWorkout(name?: string): Promise<string | null> {
+    if (!user) return null
+    const { data } = await supabase
+      .from('workouts')
+      .insert({ user_id: user.id, date: today, block_id: null, name: name?.trim() || null })
+      .select('id')
+      .single()
+    refetch()
+    return (data?.id ?? null) as string | null
+  }
+
+  return { workouts, loading, refetch, createWorkout }
 }

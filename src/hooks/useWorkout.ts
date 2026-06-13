@@ -87,9 +87,11 @@ export function useWorkout(opts: UseWorkoutOpts = {}) {
         woDate = (data?.date ?? today) as string
       } else {
         const q = supabase.from('workouts').select('id, name, date').eq('user_id', user.id)
+        // Bare /workout continues today's latest blockless session (there can be
+        // more than one a day now that routines start their own session).
         const woRes = blockId
           ? await q.eq('block_id', blockId).maybeSingle()
-          : await q.eq('date', today).is('block_id', null).maybeSingle()
+          : await q.eq('date', today).is('block_id', null).order('created_at', { ascending: false }).limit(1).maybeSingle()
         wid = (woRes.data?.id ?? null) as string | null
         woName = (woRes.data?.name ?? null) as string | null
         woDate = (woRes.data?.date ?? today) as string
