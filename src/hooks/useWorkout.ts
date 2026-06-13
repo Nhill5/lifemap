@@ -35,6 +35,20 @@ type PriorRow = {
   workout_sets: { reps: number | null; weight: number | null; unit: 'lb' | 'kg'; set_number: number; id: string }[]
 }
 
+/** Sets from the most recent (latest-dated) session among the given rows. */
+function latestSets(rows: PriorRow[]): SessionSet[] {
+  let latestDate = ''
+  let out: SessionSet[] = []
+  for (const p of rows) {
+    const d = p.workouts?.date ?? ''
+    if (d > latestDate) {
+      latestDate = d
+      out = [...p.workout_sets].sort((a, b) => a.set_number - b.set_number)
+    }
+  }
+  return out
+}
+
 export interface UseWorkoutOpts {
   /** Bind the session to a planned gym block (today). */
   blockId?: string
@@ -125,19 +139,14 @@ export function useWorkout(opts: UseWorkoutOpts = {}) {
             if (s.weight != null && s.weight > prBest) prBest = s.weight
           }
         }
-        // "Last time" is scoped to the same named workout (your split day) when
-        // this session is named — so reopening "Upper A" shows last Upper A.
-        // Unnamed sessions fall back to the most recent session with this exercise.
-        const scoped = woName ? priors.filter(p => (p.workouts?.name ?? null) === woName) : priors
-        let latestDate = ''
-        let lastSets: SessionSet[] = []
-        for (const p of scoped) {
-          const d = p.workouts?.date ?? ''
-          if (d > latestDate) {
-            latestDate = d
-            lastSets = [...p.workout_sets].sort((a, b) => a.set_number - b.set_number)
-          }
-        }
+        // "Last time" prefers the same named workout (your split day) — so
+        // reopening "Upper A" shows last Upper A. But if there's no history under
+        // this name yet (e.g. first time you load a saved routine), fall back to
+        // the most recent session that included this exercise, so the latest
+        // weight/reps always carry forward.
+        const sameName = woName ? priors.filter(p => (p.workouts?.name ?? null) === woName) : []
+        let lastSets = latestSets(sameName)
+        if (lastSets.length === 0) lastSets = latestSets(priors)
         return {
           weId: w.id,
           exerciseId: w.exercise_id,
