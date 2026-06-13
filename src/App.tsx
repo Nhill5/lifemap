@@ -4,6 +4,7 @@ import { SettingsProvider } from '@/contexts/SettingsContext'
 import { CelebrationProvider } from '@/contexts/CelebrationContext'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
 import { ReloadPrompt } from '@/components/ui/ReloadPrompt'
+import { FocusTimer } from '@/components/ui/FocusTimer'
 
 import { LoginPage }         from '@/pages/LoginPage'
 import { OnboardingPage }    from '@/pages/OnboardingPage'
@@ -105,6 +106,7 @@ export function App() {
         <CelebrationProvider>
           <RouterProvider router={router} />
           <ReloadPrompt />
+          <FocusTimer />
         </CelebrationProvider>
       </SettingsProvider>
     </AuthProvider>
