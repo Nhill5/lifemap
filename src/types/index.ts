@@ -9,7 +9,7 @@ export type GoalStatus   = 'active' | 'achieved' | 'abandoned' | 'replaced'
 export type SubGoalType  = 'schedule_it' | 'track_it'
 export type DataSource   = 'manual' | 'fitbit' | 'workout_logger'
 export type TaskStatus   = 'todo' | 'done' | 'dropped'
-export type BlockStatus  = 'planned' | 'done' | 'missed' | 'moved'
+export type BlockStatus  = 'planned' | 'done' | 'missed' | 'moved' | 'dropped'
 export type BlockSource  = 'sub_goal' | 'task' | 'external'
 export type TrackRating  = 'hit' | 'close' | 'missed'
 export type EventType    = 'task' | 'subgoal' | 'milestone' | 'chief_goal' | 'unlock' | 'comeback' | 'PR'
@@ -83,6 +83,9 @@ export interface SubGoal {
   target_unit: string | null
   data_source: DataSource
   status: GoalStatus
+  recurrence_days: number[] | null   // §25.5 — 0=Sun..6=Sat; null/empty = flexible cadence
+  recurrence_time: string | null     // HH:MM — null = untimed (generates a to-do)
+  recurrence_duration_min: number | null
   created_at: string
 }
 
@@ -95,6 +98,7 @@ export interface Task {
   status: TaskStatus
   due_date: string | null
   rollover_count: number            // zombie detection ≥ 3–4
+  is_major: boolean                 // surfaces at week level (§25)
   completed_at: string | null
   created_at: string
 }
@@ -106,10 +110,20 @@ export interface Block {
   task_id: string | null
   source: BlockSource
   title: string
+  description: string | null        // optional free-text notes
   date: string                      // ISO date
-  start_time: string                // HH:MM
-  end_time: string
+  start_time: string | null         // HH:MM — null = untimed (a to-do for the day)
+  end_time: string | null
   status: BlockStatus
+}
+
+export interface ChiefGoalProgress {
+  id: string
+  user_id: string
+  chief_goal_id: string
+  date: string                      // ISO date
+  value: number
+  created_at: string
 }
 
 /* ---- Commitment anchor ---- */
@@ -169,6 +183,13 @@ export interface FitbitTokens {
   access_token: string              // encrypted, server-side only
   refresh_token: string
   expires_at: string
+}
+
+export interface FitbitConnection {
+  user_id: string
+  connected_at: string
+  last_sync_at: string | null
+  scopes: string | null
 }
 
 export type FitbitMetric = 'steps' | 'sleep' | 'resting_hr' | 'active_minutes'

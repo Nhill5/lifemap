@@ -3,6 +3,8 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { CelebrationProvider } from '@/contexts/CelebrationContext'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
+import { ReloadPrompt } from '@/components/ui/ReloadPrompt'
+import { FocusTimer } from '@/components/ui/FocusTimer'
 
 import { LoginPage }         from '@/pages/LoginPage'
 import { OnboardingPage }    from '@/pages/OnboardingPage'
@@ -11,9 +13,11 @@ import { DayPage }           from '@/pages/DayPage'
 import { WeekPage }          from '@/pages/WeekPage'
 import { BucketsPage }       from '@/pages/BucketsPage'
 import { BucketDetailPage }  from '@/pages/BucketDetailPage'
+import { BucketNotesPage, NoteEditorPage } from '@/pages/BucketNotesPage'
 import { EveningMirrorPage } from '@/pages/EveningMirrorPage'
 import { WeeklyMirrorPage }  from '@/pages/WeeklyMirrorPage'
 import { WorkoutPage }       from '@/pages/WorkoutPage'
+import { WorkoutBookPage }   from '@/pages/WorkoutBookPage'
 import { SettingsPage }      from '@/pages/SettingsPage'
 
 const router = createBrowserRouter([
@@ -46,6 +50,14 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><BucketDetailPage /></ProtectedRoute>,
   },
   {
+    path: '/buckets/:id/notes',
+    element: <ProtectedRoute><BucketNotesPage /></ProtectedRoute>,
+  },
+  {
+    path: '/buckets/:id/notes/:noteId',
+    element: <ProtectedRoute><NoteEditorPage /></ProtectedRoute>,
+  },
+  {
     path: '/mirror/evening',
     element: <ProtectedRoute><EveningMirrorPage /></ProtectedRoute>,
   },
@@ -54,7 +66,15 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><WeeklyMirrorPage /></ProtectedRoute>,
   },
   {
+    path: '/workouts',
+    element: <ProtectedRoute><WorkoutBookPage /></ProtectedRoute>,
+  },
+  {
     path: '/workout',
+    element: <ProtectedRoute><WorkoutPage /></ProtectedRoute>,
+  },
+  {
+    path: '/workout/session/:sessionId',
     element: <ProtectedRoute><WorkoutPage /></ProtectedRoute>,
   },
   {
@@ -85,6 +105,8 @@ export function App() {
       <SettingsProvider>
         <CelebrationProvider>
           <RouterProvider router={router} />
+          <ReloadPrompt />
+          <FocusTimer />
         </CelebrationProvider>
       </SettingsProvider>
     </AuthProvider>

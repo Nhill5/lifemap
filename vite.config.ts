@@ -7,6 +7,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // 'autoUpdate' + skipWaiting/clientsClaim below: a new deploy takes over
+      // immediately and reloads — no stale cached build can get stuck. The
+      // ReloadPrompt also polls for updates so open tabs refresh quickly.
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/*.svg', 'icons/*.png'],
       manifest: {
@@ -35,6 +38,13 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Web Push handlers (push + notificationclick) folded into the SW
+        importScripts: ['push-sw.js'],
+        // Never serve a stale app: new SW activates + claims clients at once,
+        // old precaches are purged.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

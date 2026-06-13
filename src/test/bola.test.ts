@@ -95,6 +95,8 @@ beforeAll(async () => {
 
   await admin.from('track_logs').insert({ user_id: uidB, sub_goal_id: sg!.id, date: '2026-06-04', rating: 'hit', source: 'manual' })
 
+  await admin.from('chief_goal_progress').insert({ user_id: uidB, chief_goal_id: cg!.id, date: '2026-06-04', value: 210 })
+
   const { data: ex } = await admin
     .from('exercises')
     .insert({ user_id: uidB, name: 'B-squat' })
@@ -114,7 +116,11 @@ beforeAll(async () => {
 
   await admin.from('workout_sets').insert({ workout_exercise_id: workoutExerciseIdB, set_number: 1, reps: 5, weight: 135, unit: 'lb' })
   await admin.from('fitbit_tokens').insert({ user_id: uidB, access_token: 'tok_b', refresh_token: 'ref_b', expires_at: new Date(Date.now() + 3_600_000).toISOString() })
+  // Seed a token for User A too — to prove even the OWNER can't read tokens via the API
+  await admin.from('fitbit_tokens').insert({ user_id: uidA, access_token: 'tok_a', refresh_token: 'ref_a', expires_at: new Date(Date.now() + 3_600_000).toISOString() })
   await admin.from('fitbit_data').insert({ user_id: uidB, date: '2026-06-04', metric: 'steps', value: 9000 })
+  await admin.from('fitbit_connections').insert({ user_id: uidB, scopes: 'activity weight' })
+  await admin.from('push_subscriptions').insert({ user_id: uidB, endpoint: `https://push.example/${TS}-b`, p256dh: 'p256dh_b', auth: 'auth_b' })
   await admin.from('journal_entries').insert({ user_id: uidB, date: '2026-06-04', scope: 'day', prompt: 'p', body: 'b' })
   await admin.from('events').insert({ user_id: uidB, type: 'task', weight: 1, payload: {} })
   await admin.from('unlocks').insert({ user_id: uidB, feature: 'week_zoom' })
@@ -140,10 +146,10 @@ describe('BOLA — User A cannot access User B data via PostgREST API', () => {
 
   // Tables with direct user_id: assert User B's rows are invisible to User A
   const directTables = [
-    'buckets', 'chief_goals', 'sub_goals', 'tasks', 'blocks',
+    'buckets', 'chief_goals', 'chief_goal_progress', 'sub_goals', 'tasks', 'blocks',
     'day_plans', 'track_logs', 'workouts',
-    'fitbit_tokens', 'fitbit_data', 'journal_entries',
-    'events', 'unlocks', 'notifications_log',
+    'fitbit_tokens', 'fitbit_data', 'fitbit_connections', 'journal_entries',
+    'events', 'unlocks', 'notifications_log', 'push_subscriptions',
   ]
 
   for (const table of directTables) {
@@ -153,6 +159,12 @@ describe('BOLA — User A cannot access User B data via PostgREST API', () => {
       expect(leaked, `${table} leaked ${leaked.length} row(s)`).toHaveLength(0)
     })
   }
+
+  it('fitbit_tokens: even the OWNER cannot read tokens via the API (server-side only)', async () => {
+    // User A has a seeded token row, but the locked-down RLS must expose 0 rows.
+    const rows = await asA('fitbit_tokens')
+    expect(rows, `owner saw ${rows.length} token row(s) — tokens must be service-role only`).toHaveLength(0)
+  })
 
   it('profiles: User B profile not visible to User A', async () => {
     const rows = await asA('profiles')
